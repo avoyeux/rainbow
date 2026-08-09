@@ -1,0 +1,114 @@
+# Stores the 'global' arguments for the repository
+
+# PROJECT metadata
+project:
+    name: RainbowK3d
+    version: 1.0.0
+    author: VOYEUX Alfred
+    description: "3D visualization and re-projection of a solar protuberance."
+
+# ROOTPATH project
+root_path: &root !rootpath  # setting the root path dynamically
+
+# PATHs
+path:
+
+    # DIRECTORIEs
+    dir:
+
+        # PATHs code directories
+        code:
+            path: &code !join [*root, 'codes']
+
+            test: !join [*code, 'tests'] 
+            misc: !join [*code, 'miscellaneous']
+            animation: !join [*code, 'animation']
+            manual_test: !join [*code, 'manual_tests']
+
+            data: &datacode !join [*code, 'data']
+            fit: !join [*datacode, 'polynomial_fit']
+            fake_data: !join [*datacode, 'fake_data']
+            fusion_data: !join [*datacode, 'fusion_data']
+            quick_data: !join [*datacode, 'quick_visualization_data']
+
+            projection: 
+                path: &projection !join [*code, 'projection']
+
+                plot: !join [*projection, 'plotting']
+                helpers: !join [*projection, 'helpers']
+                dataclasses: !join [*projection, 'format_data']
+
+        # PATHs data directories
+        data: 
+            path: &data !join [*root, 'data_files']
+            
+            sdo: !join [*data, 'sdo']
+            mp4: !join [*data, 'mp4_saves']
+            temp: !join [*data, 'temporary']
+            hdf5: &hdf5 !join [*data, 'hdf5_files']
+            synoptic_maps: !join [*data, 'synoptic_maps']
+
+            cubes:
+                path: &cubes !join [*data, 'cubes']
+
+                karine: !join [*cubes, 'karine']
+                alfred: !join [*cubes, 'alfred']
+                fake: !join [*cubes, 'save_from_toto']
+
+            stereo: 
+                path: &stereo !join [*data, 'stereo']
+
+                avg: !join [*stereo, 'avg']
+                int: !join [*stereo, 'int']
+
+                mask:
+                    alf: !join [*stereo, 'masque']
+                    karine: !join [*stereo, 'masque_karine']
+
+            fake:
+                path: &fake !join [*data, 'fake_data']
+
+                h5: !join [*fake, 'h5']
+                png: !join [*fake, 'png']
+                fits: !join [*fake, 'fits']
+
+            result:
+                path: &result !join [*data, 'work_done']
+
+                texture: !join [*result, 'textures']
+                envelope: !join [*result, 'envelope']
+                projection: !join [*result, 'projection']
+                contours: !join [*result, 'contours_3images']
+                stereo: !join [*result, 'opening_stereo_new']
+
+                stats: 
+                    path: &stats !join [*result, 'stats']
+
+                    plot: !join [*stats, 'stats_plot']
+
+    # PATHs to data files
+    data:
+        stereob_info: !join [*cubes, 'rainbow_stereob_304.save']
+        sdo_timestamp: !join [*data, 'SDO_timestamps.txt']
+
+        real: !join [*hdf5, 'data.h5']
+        fake_cube: !join [*hdf5, 'fake_cube.h5']
+        fake_toto: !join [*hdf5, 'fake_from_toto.h5']
+        fusion: !join [*hdf5, 'data_with_fake_from_toto.h5']
+
+        test: !join [*hdf5, 'testing.h5']
+
+# RUN configuration
+run:
+    processes: 14
+    verbose: 2
+    flush: False
+    test_plots: False
+
+    # DEBUG configuration
+    debug:
+        tests: False  # ! need to implement this somewhere
+
+        processes: 10
+        verbose: 1
+        flush: True

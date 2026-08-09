@@ -1,26 +1,34 @@
-# ALL blacklisted
+# BLACKLIST everything
 *
 
-# DIRs whitelisted
-!Common/
-!Common/**/*
-!codes/
-!codes/**/
-!data_files/
+# WHITELIST project config
+!config/
+!config/**/
+!config/**/*.py
+!config/**/*.yml
+
+# WHITELIST source files
+!src/
+!src/**/
+!src/**/*.py
+!src/**/*.md
+!src/**/*.txt
+!src/**/*.pro
+!src/**/*.ipynb
+
+# WHITELIST data files
+!data/
+!data/**/
+!data/**/*.txt
+
+# BLACKLIST Python cache
+**/__pycache__/
 
 # BLACKLIST hidden directories
 **/.*/
 
-# TYPEs whitelisted
-!**/*.pro
-!**/*.py
-!**/*.pyi
-!**/*.ipynb
-!**/*.md
-!**/*.yml
-!**/*.txt
-
-# FILEs whitelisted
-!README.md
-!requirements.txt
+# WHITELIST standard files
 !.gitignore
+!pyproject.toml
+!LICENSE
+!README.md
