@@ -1,24 +1,37 @@
-# RAINBOW event animation using the K3D library.
-This github repository is made up of codes related to the 3D visualisation of a solar protuberance using acquisitions made by STEREO and SDO from the 23.07.2012 till 25.07.2012. This was done to possibly study the periodic properties of coronal rain. The K3D library is a Jupyter library specialised in 3D visualisations.
+# RAINBOW
 
-The codes in said repository are as follows:
+3D visualisation and re-projection of a solar protuberance (the "Rainbow" event, 23–25 July 2012), observed by STEREO and SDO, to study the periodic properties of coronal rain. The 3D visualisation relies on the [K3D](https://github.com/K3D-tools/K3D-jupyter) Jupyter library.
 
-- `Animation_3D_main.py`: the Python code where all the data preprocessing and the implementation to the k3d library is done. This code is then used in the `new_3D_animation.ipynb` Jupyter notebook code.
+Requires Python >= 3.12.3
 
-- `new_3D_animation.ipynb`: Jupyter notebook code used to run the aforementioned Python code. Inside said notebook, in depth explanations on the possible arguments is also given.
+## Setup
 
-- `k3d_voxel_stats.py`: Python code used to save some possibly useful statistics on the protuberance positions. The results are saved in a .csv file.
+Create a virtual environment, then install the project (dependencies are defined in `pyproject.toml`):
 
-- `stats_to_plot.py`: Python code to plot the data from the .csv file created with `k3d_voxel_stats.py`.
+**Linux / macOS**
 
-- `mask_to_white.py`: Python code to change the initial un processed masks to uint8 greyscale masks where initial null values are seen as white (i.e. 255).
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install .
+```
 
-- `figures_sdostereo.py`: Python code using the k3d screenshots with the stereo and sdo acquisitions to create 5 image plots to then be used in a gif. The GIF showcases the time evolution of the protuberance following the point of view of SDO and STEREO.
+**Windows (PowerShell)**
 
-- `common_alf.py`: Python code with some of my most 'polyvalent' functions. It is still a work in progress.
+```powershell
+py -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install .
+```
 
-- `Figure_making.py`: Python code for plotting 3 images figures with the mask contours and the latitude and longitude gridlines. A corresponding GIF is also created.
+> Jupyter can then be used from the notebook in `src/animation/animation_vis.ipynb`.
 
-- `GIF_maker.py`: Older Python code to create GIFs. This code might be deprecated but kept for now. Will most likely be deleted in the final version of this repository.
+## Structure
 
-- `GIF_maker2.py`: Python code used to cut in 2 the images gotten from the mp4 video in Sir Auchere's presentation. 
+- `src/animation/` — K3D 3D visualisation of the filament data and its polynomial fit ([animation_code.py](src/animation/animation_code.py)) with the entry-point notebook [animation_vis.ipynb](src/animation/animation_vis.ipynb).
+- `src/projection/` — orthographic re-projection of the polynomial fit onto the SDO point of view, envelope extraction, image warping and plotting.
+- `src/data/` — HDF5 data creation from the STEREO/SDO acquisitions ([cubes.py](src/data/cubes.py)), fake data generation, polynomial fitting and merging of real + fake data.
+- `src/miscellaneous/` — small utilities such as PNG-to-video conversion.
+- `src/tests/` & `src/manual_tests/` — automated and manual tests.
+- `src/archive/` — deprecated and legacy code (kept for reference).
+- `config/` — configuration settings (`config.yml`). 
