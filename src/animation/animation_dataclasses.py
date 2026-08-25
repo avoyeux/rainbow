@@ -111,6 +111,7 @@ class ParentInfo:
     # METADATA
     group_path: str
     opacity: float
+    opacity_polynomial: float
     colour: str
 
     # BORDERs index
@@ -210,7 +211,10 @@ class FakeCubeInfo(ParentInfo):
 
         # PARENT post_init
         super(FakeCubeInfo, self).__post_init__()
-        self.value_to_index = {value: index for index, value in enumerate(self.time_indexes_fake)}
+        self.value_to_index = {
+            int(value): index
+            for index, value in enumerate(self.time_indexes_fake)
+        }
 
     def __getitem__(self, index: int) -> list[np.ndarray]:
         """

@@ -21,8 +21,9 @@
 !data/**/
 !data/**/*.txt
 
-# BLACKLIST Python cache
+# BLACKLIST cache
 **/__pycache__/
+**/*.egg-info/
 
 # BLACKLIST hidden directories
 **/.*/

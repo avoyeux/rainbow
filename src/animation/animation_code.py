@@ -115,22 +115,7 @@ class Setup:
         self.radius_index: float
 
         # RUN
-        self.paths = self.setup_paths()
         self.cubes: CubesData = self.get_data()
-
-    def setup_paths(self) -> dict[str, str]:
-        """
-        Creates a dictionary for the filepaths.
-
-        Returns:
-            dict[str, str]: the filepath dictionary.
-        """
-
-        # PATHs save
-        paths = {'sdo': config.path.dir.data.sdo}
-
-        # PATHs update
-        return paths
 
     def _choices(self, plot_choices: list[str]) -> dict[str, bool]:
         """
@@ -267,7 +252,7 @@ class Setup:
                 opacity=0.15,
                 interpolate=False,
             )
-        
+
         if self.choices['line of sight stereo']:
             path = init_path + 'Filtered/STEREO line of sight'
             cubes.los_stereo = self.get_cube_info(
@@ -277,7 +262,7 @@ class Setup:
                 opacity=0.15,
                 interpolate=False,
             )
-        
+
         # POVs sdo, stereo
         if self.choices['pov sdo']:
             # SDO positions
@@ -331,7 +316,10 @@ class Setup:
         """
 
         # FOV get
-        hdul = fits.open(os.path.join(self.paths['sdo'], 'AIA_fullhead_000.fits.gz'))
+        hdul = fits.open(os.path.join(
+            config.path.dir.data.sdo,
+            'AIA_fullhead_000.fits.gz',
+        ))
         image_shape = hdul[0].data.shape
         fov_degrees = image_shape[0] * hdul[0].header['CDELT1'] / 3600
         hdul.close()
@@ -431,6 +419,7 @@ class Setup:
             opacity: float = 1.,
             interpolate: bool = True,
             colour: str = 'blue',
+            opacity_polynomial: float = 1.,
             cube_type: str = 'real',
         ) -> CubeInfo | FakeCubeInfo | UniqueCubeInfo:
         """
@@ -441,6 +430,8 @@ class Setup:
             group_path (str): the group path to the group where the needed datasets are stored.
             opacity (float, optional): the opacity of the voxels in the visualisation.
                 Defaults to 1..
+            opacity_polynomial (float, optional): the opacity of the polynomial fits in the visualisation.
+                Defaults to 1.
             interpolate (bool, optional): if there is interpolation data in the group to visualise.
                 Defaults to True.
             colour (str, optional): the colour of the voxels in the visualisation.
@@ -481,6 +472,7 @@ class Setup:
                 group_path=group_path,
                 colour=colour,
                 opacity=opacity,
+                opacity_polynomial=opacity_polynomial,
                 xt_min_index=xt_min_index,
                 yt_min_index=yt_min_index,
                 zt_min_index=zt_min_index,
@@ -500,6 +492,7 @@ class Setup:
             cube_info = UniqueCubeInfo(
                 group_path=group_path,
                 opacity=opacity,
+                opacity_polynomial=opacity_polynomial,
                 colour=colour,
                 xt_min_index=xt_min_index,
                 yt_min_index=yt_min_index,
@@ -512,6 +505,7 @@ class Setup:
             cube_info = FakeCubeInfo(
                 group_path=group_path,
                 opacity=opacity,
+                opacity_polynomial=opacity_polynomial,
                 colour=colour,
                 xt_min_index=xt_min_index,
                 yt_min_index=yt_min_index,
@@ -578,7 +572,7 @@ class Setup:
             cube_type: str = ...,
             interpolate: bool = ...,
         ) -> list[PolynomialData] | list[UniquePolynomialData] | None: ...
-    
+
     def get_polynomial_data(
             self,
             HDF5File: h5py.File,
@@ -592,7 +586,7 @@ class Setup:
         Args:
             group_path (str): the main group path where all the different corresponding polynomial
                 fits are stored.
-            cube_type (str, optional): the type of cube to visualise. Defaults to 'unique'.
+            cube_type (str, optional): the type of cube to visualize. Defaults to 'unique'.
             interpolate (bool, optional): if the fit data exits for that group path.
                 Defaults to True.
 
@@ -601,7 +595,7 @@ class Setup:
                 fits information. If there is no polynomial data, it returns None.
         """
 
-        # ! need to change this so that I can also decide to visualise the extended polynomial fit
+        # ! need to change this so that I can also decide to visualize the extended polynomial fit
 
         if self.choices['fit'] and interpolate:  # todo add 'or self.choices['extended fit']'
             # POLYNOMIALs setup
@@ -1002,7 +996,7 @@ class K3dAnimation(Setup):
                 plots[i + 1] = k3d.voxels(
                     voxels=polynomial_data[index].transpose((2, 1, 0)),
                     name=polynomial_data.name,
-                    opacity=cube.opacity,  # todo change it to polynomial opacity
+                    opacity=cube.opacity_polynomial,
                     color_map=[polynomial_data.color_hex],
                     translation=translation,
                     **kwargs,

@@ -40,8 +40,8 @@ path:
 
         # PATHs data directories
         data: 
-            path: &data !join [*root, 'data_files']
-            
+            path: &data !join [*root, 'data']
+
             sdo: !join [*data, 'sdo']
             mp4: !join [*data, 'mp4_saves']
             temp: !join [*data, 'temporary']
