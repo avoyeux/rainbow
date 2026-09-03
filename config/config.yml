@@ -3,7 +3,7 @@
 # PROJECT metadata
 project:
     name: RainbowK3d
-    version: 1.0.0
+    version: 1.0.1
     author: VOYEUX Alfred
     description: "3D visualization and re-projection of a solar protuberance."
 
@@ -15,10 +15,9 @@ path:
 
     # DIRECTORIEs
     dir:
-
         # PATHs code directories
         code:
-            path: &code !join [*root, 'codes']
+            path: &code !join [*root, 'src']
 
             test: !join [*code, 'tests'] 
             misc: !join [*code, 'miscellaneous']
