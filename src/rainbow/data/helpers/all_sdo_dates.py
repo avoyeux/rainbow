@@ -17,7 +17,7 @@ from sitools2 import SdoClientMedoc  # IAS package for the SDO data
 from common import Decorators
 
 # IMPORTs local
-from config import config
+from ...config import config
 
 # TYPE ANNOTATIONs
 from typing import cast
@@ -188,8 +188,8 @@ class AllSDOMetadata:
         metadata.date_obs = cast(datetime, metadata.date_obs).replace(microsecond=0)
         return metadata
 
-    def check_dates(self) -> bool:
-
+    def check_dates(self) -> None:
+        # ! should return bool
         # * need to compare the result with the dates that are in the 'SDO_timestamps.txt' file to
         # * make sure that the dates coincide with the ones in the text file.
         pass

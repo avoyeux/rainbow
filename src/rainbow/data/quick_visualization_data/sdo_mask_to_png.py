@@ -17,7 +17,7 @@ from astropy.io import fits
 from common import Decorators
 
 # IMPORTs local
-from config import config
+from ...config import config
 
 # TYPE ANNOTATIONs
 from typing import Any, cast, TYPE_CHECKING

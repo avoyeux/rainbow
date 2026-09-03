@@ -1,5 +1,6 @@
 """
-Directory containing code to setup the whole repository structure.
+Sets up the whole repository directory structure and creates a corresponding object to easily
+have access to the fullpath of each directory.
 """
 from __future__ import annotations
 
@@ -14,8 +15,6 @@ __all__ = ['config']
 
 
 
-# PATH to config
-config_path = os.path.join(root_path, 'config', 'config.yml')
-
 # CONFIG
+config_path = os.path.join(root_path, 'config', 'config.yml')
 config = ConfigToObject(config_path).config

@@ -17,7 +17,7 @@ path:
     dir:
         # PATHs code directories
         code:
-            path: &code !join [*root, 'src']
+            path: &code !join [*root, 'src', 'rainbow']
 
             test: !join [*code, 'tests'] 
             misc: !join [*code, 'miscellaneous']

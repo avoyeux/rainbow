@@ -313,8 +313,8 @@ class BaseHDF5Protuberance(BaseHdf5Creator):
             },
         }
         # BORDERs add
-        if borders is not None: raw |= borders
-        
+        if borders is not None: raw.update(borders) # ? it was |= before, same operation ? #type:ignore
+
         # ADD group
         self.add_group(group, raw, data_name)
         return group

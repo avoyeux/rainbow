@@ -25,19 +25,21 @@ import astropy.coordinates  # ! for the static type checker: make sure it introd
 from astropy import units as u
 
 # IMPORTs personal
-from common import Decorators, CustomDate, MultiProcessing, StringFormatter
+from common import Decorators, CustomDate, StringFormatter
 
 # IMPORTs local
-from config import config
-from src.data.helpers.all_sdo_dates import AllSDOMetadata
-from src.data.polynomial_fit.base_polynomial_fit import Polynomial
-from src.data.base_hdf5_creator import VolumeInfo, BaseHDF5Protuberance
+from ..config import config
+from rainbow.miscellaneous.shared_memory import Shared
+from rainbow.data.helpers.all_sdo_dates import AllSDOMetadata
+from rainbow.data.polynomial_fit.base_polynomial_fit import Polynomial
+from rainbow.data.base_hdf5_creator import VolumeInfo, BaseHDF5Protuberance
 
 # TYPE ANNOTATIONs
 from typing import Any, Callable, cast, TYPE_CHECKING
 if TYPE_CHECKING:
     import queue
     import multiprocessing.shared_memory
+    import numpy.typing as npt
     from sitools2.clients.sdo_data import SdoData
     type ManagerQueueProxy[T] = queue.Queue[T]  # used parent: actual queue type is not known
     type SharedMemoryAlias = multiprocessing.shared_memory.SharedMemory
@@ -1461,18 +1463,18 @@ class DataSaver(BaseHDF5Protuberance):
         borders: dict[str, dict[str, float]] = cast(dict[str, dict[str, float]], borders)
         
         # COORDs
-        coords = data.coords.astype('float64')
+        coords: npt.NDArray[np.float64] = data.coords.astype('float64')
 
         # CONVERSION heliocentric in km
-        coords[1, :] = coords[1, :] * self.dx['data'] + borders['xt_min']['data']
-        coords[2, :] = coords[2, :] * self.dx['data'] + borders['yt_min']['data']
-        coords[3, :] = coords[3, :] * self.dx['data'] + borders['zt_min']['data']
+        coords[1, :] = coords[1, :] * self.dx['data'] + borders['xt_min']['data']  #type:ignore
+        coords[2, :] = coords[2, :] * self.dx['data'] + borders['yt_min']['data']  #type:ignore
+        coords[3, :] = coords[3, :] * self.dx['data'] + borders['zt_min']['data']  #type:ignore
 
         # SETUP multiprocessing
         manager = mp.Manager()
         input_queue = manager.Queue()
         output_queue = manager.Queue()
-        shm, coords = MultiProcessing.create_shared_memory(coords)
+        shm, shared = Shared.create(coords)
         for i in range(self.max_len): input_queue.put(i)
         for _ in range(self.nb_processes): input_queue.put(None)
 
@@ -1481,7 +1483,7 @@ class DataSaver(BaseHDF5Protuberance):
         for i in range(self.nb_processes):
             process = mp.Process(
                 target=self.skyCoords_slice,
-                args=(coords, input_queue, output_queue),
+                args=(shared, input_queue, output_queue),
             )
             process.start()
             processes[i] = process
@@ -1516,12 +1518,9 @@ class DataSaver(BaseHDF5Protuberance):
             output_queue (ManagerQueueProxy): multiprocessing.Manager.Queue object used to extract
                 the function results.
         """
-        
+
         # DATA open
-        shm, coords = cast(
-            tuple[SharedMemoryAlias, np.ndarray],
-            MultiProcessing.open_shared_memory(coords_dict)
-        )
+        shm, coords = Shared.open(coords_dict)
 
         while True:
             # CHECK queue
@@ -1539,7 +1538,7 @@ class DataSaver(BaseHDF5Protuberance):
                 frame=sunpy.coordinates.frames.HeliographicCarrington,
                 representation_type='cartesian'
             )
-            
+
             # SAVE
             output_queue.put((index, skyCoord))
         shm.close()
@@ -1549,7 +1548,9 @@ class DataSaver(BaseHDF5Protuberance):
 if __name__=='__main__':
 
     instance = DataSaver(
-        integration_time=[24],
+        filename='test.h5',
+        processes=8,
+        integration_time=[3, 6, 12, 24],
         polynomial_order=[4],
         feet_sigma=20,
         south_leg_sigma=20,

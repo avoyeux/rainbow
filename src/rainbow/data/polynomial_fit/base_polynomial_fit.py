@@ -15,10 +15,11 @@ import sparse
 import numpy as np
 
 # IMPORTs personal
-from common import Decorators, MultiProcessing
+from common import Decorators
 
 # IMPORTs local
-from config import config
+from ...config import config
+from ...miscellaneous.shared_memory import Shared
 
 # TYPE ANNOTATIONs
 from typing import Any, Callable, cast, Literal, TYPE_CHECKING
@@ -226,17 +227,14 @@ class Polynomial:
         output_queue = manager.Queue()
         value = manager.Value('i', self.time_len)
         processes_nb = min(self.processes, self.time_len)
-        shm, data = cast(
-            tuple[shared_memory.SharedMemory, np.ndarray],
-            MultiProcessing.create_shared_memory(data),
-        )
+        shm, shared = Shared.create(data)
 
         # RUN processes
         processes: list[mp.Process] = cast(list[mp.Process], [None] * processes_nb)
         for i in range(processes_nb):
             p = mp.Process(
                 target=self.no_duplicates_data_sub,
-                args=(data, lock, value, output_queue),
+                args=(shared, lock, value, output_queue),
             )
             p.start()
             processes[i] = p
@@ -270,10 +268,7 @@ class Polynomial:
         """
         
         # DATA open
-        shm, array = cast(  # todo change this when the @overload is added to the method.
-            tuple[shared_memory.SharedMemory, np.ndarray],
-            MultiProcessing.open_shared_memory(data_dict),
-        )
+        shm, array = Shared.open(data_dict)
 
         while True:
             # CHECK input
@@ -316,7 +311,7 @@ class Polynomial:
 
         # CONSTANTs
         if self.data.coords.shape[0] == 4:
-            self.time_len: int = self.data.coords[0, :].max() + 1
+            self.time_len: int = self.data.coords[0, :].max() + 1  #type:ignore
         else:
             self.time_len = 1
         process_nb = min(self.processes, self.time_len)
@@ -327,11 +322,11 @@ class Polynomial:
         # MULTIPROCESSING setup
         shm_coords, coords = cast(  # todo change this when the @overload is added to the method.
             tuple[shared_memory.SharedMemory, np.ndarray], 
-            MultiProcessing.create_shared_memory(self.data.coords.astype('float64')),
+            Shared.create(self.data.coords.astype('float64')),
         )
         shm_sigma, sigma = cast(
             tuple[shared_memory.SharedMemory, dict],
-            MultiProcessing.create_shared_memory(sigma),
+            Shared.create(sigma),
         )
         manager = mp.Manager()
         lock = manager.Lock()
@@ -411,14 +406,8 @@ class Polynomial:
         """
         
         # DATA open
-        shm_coords, coords = cast(  # todo change this when the @overload is added to the method.
-            tuple[shared_memory.SharedMemory, np.ndarray],
-            MultiProcessing.open_shared_memory(coords_dict),
-        )
-        shm_sigma, sigma = cast(  # todo change this when the @overload is added to the method.
-            tuple[shared_memory.SharedMemory, np.ndarray],
-            MultiProcessing.open_shared_memory(sigma_dict),
-        )
+        shm_coords, coords = Shared.open(coords_dict)
+        shm_sigma, sigma = Shared.open(sigma_dict)
         
         while True:
             # CHECK input

@@ -23,8 +23,8 @@ from matplotlib import colors as mcolors
 from common import Decorators, Plot
 
 # IMPORTs local
-from config import config
-from src.animation.animation_dataclasses import (
+from ..config import config
+from rainbow.animation.animation_dataclasses import (
     CubesData, CubesConstants, CubeInfo, FakeCubeInfo, UniqueCubeInfo,
     PolynomialData, UniquePolynomialData,
 )
@@ -409,6 +409,7 @@ class Setup:
             opacity: float = ...,
             interpolate: bool = ...,
             colour: str = ...,
+            opacity_polynomial: float = ...,
             cube_type: str = ...,
         ) -> CubeInfo | FakeCubeInfo | UniqueCubeInfo: ...
 
@@ -428,15 +429,15 @@ class Setup:
         Args:
             HDF5File (h5py.File): the HDF5 file where the data is stored.
             group_path (str): the group path to the group where the needed datasets are stored.
-            opacity (float, optional): the opacity of the voxels in the visualisation.
+            opacity (float, optional): the opacity of the voxels in the visualization.
                 Defaults to 1..
-            opacity_polynomial (float, optional): the opacity of the polynomial fits in the visualisation.
+            opacity_polynomial (float, optional): the opacity of the polynomial fits in the visualization.
                 Defaults to 1.
-            interpolate (bool, optional): if there is interpolation data in the group to visualise.
+            interpolate (bool, optional): if there is interpolation data in the group to visualize.
                 Defaults to True.
-            colour (str, optional): the colour of the voxels in the visualisation.
+            colour (str, optional): the colour of the voxels in the visualization.
                 Defaults to 'blue'.
-            cube_type (str, optional): the type of cube to visualise. Defaults to 'real'.
+            cube_type (str, optional): the type of cube to visualize. Defaults to 'real'.
 
         Returns:
             CubeInfo | FakeCubeInfo | UniqueCubeInfo: the protuberance and polynomial fit
@@ -772,7 +773,7 @@ class K3dAnimation(Setup):
         self.outlines = outlines
 
         # PLACEHOLDERs
-        self.plot: k3d.plot.Plot  # plot object
+        self.plot: k3d.plot.Plot  # plot object  #type:ignore
         self.plot_alldata: list[VoxelAlias] # voxels plot of the all data 
         self.plot_dupli_new: list[VoxelAlias]  # same for the second method
         self.plot_full_alldata: list[VoxelAlias]  # voxels plot for the full integration
@@ -982,7 +983,7 @@ class K3dAnimation(Setup):
             voxels=cube[index][0].transpose((2, 1, 0)),
             name=cube.name,
             opacity=cube.opacity,
-            color_map=[self.color_str_to_hex(cube.colour)],
+            color_map=[self.color_str_to_hex(cube.colour)],  #type:ignore
             translation=translation,
             **kwargs,
         )
@@ -997,7 +998,7 @@ class K3dAnimation(Setup):
                     voxels=polynomial_data[index].transpose((2, 1, 0)),
                     name=polynomial_data.name,
                     opacity=cube.opacity_polynomial,
-                    color_map=[polynomial_data.color_hex],
+                    color_map=[polynomial_data.color_hex],  #type:ignore
                     translation=translation,
                     **kwargs,
                 )

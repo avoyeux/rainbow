@@ -33,3 +33,4 @@
 !pyproject.toml
 !LICENSE
 !README.md
+!uv.lock
