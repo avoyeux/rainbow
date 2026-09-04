@@ -1016,6 +1016,9 @@ class DataSaver(BaseHDF5Protuberance):
         # DATA path
         filepath = os.path.join(self.paths['save'], self.filename)
 
+        # FLUSH to make written data visible
+        H5PYFile.flush()
+
         # MULTIPROCESSING setup
         manager = mp.Manager()
         input_queue = manager.Queue()
@@ -1074,7 +1077,7 @@ class DataSaver(BaseHDF5Protuberance):
         """
 
         # DATA fetch
-        with h5py.File(filepath, 'r') as H5PYFile:
+        with h5py.File(filepath, 'r', locking=False) as H5PYFile:
             data = DataSaver.get_COO(H5PYFile, datapath.removesuffix(' with feet'))
 
         while True:
@@ -1549,7 +1552,7 @@ if __name__=='__main__':
 
     instance = DataSaver(
         filename='test.h5',
-        processes=8,
+        processes=32,
         integration_time=[3, 6, 12, 24],
         polynomial_order=[4],
         feet_sigma=20,

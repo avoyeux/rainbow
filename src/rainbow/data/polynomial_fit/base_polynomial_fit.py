@@ -320,14 +320,8 @@ class Polynomial:
         sigma = np.ones(self.data.coords.shape[1], dtype='float64')  # ! changed this
 
         # MULTIPROCESSING setup
-        shm_coords, coords = cast(  # todo change this when the @overload is added to the method.
-            tuple[shared_memory.SharedMemory, np.ndarray], 
-            Shared.create(self.data.coords.astype('float64')),
-        )
-        shm_sigma, sigma = cast(
-            tuple[shared_memory.SharedMemory, dict],
-            Shared.create(sigma),
-        )
+        shm_coords, coords = Shared.create(self.data.coords.astype('float64'))
+        shm_sigma, sigma = Shared.create(sigma)
         manager = mp.Manager()
         lock = manager.Lock()
         value = manager.Value('i', self.time_len)
@@ -675,7 +669,7 @@ class Polynomial:
                 np.ndarray: the polynomial results.
             """
 
-            # Initialisation
+            # Initialization
             result: np.ndarray = cast(np.ndarray, 0)
 
             # Calculating the polynomial
