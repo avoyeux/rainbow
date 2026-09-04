@@ -4,6 +4,7 @@
 # WHITELIST project config
 !config/
 !config/**/
+!config/**/*.sh
 !config/**/*.py
 !config/**/*.yml
 
