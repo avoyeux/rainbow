@@ -67,9 +67,8 @@ class AllSDOMetadata:
         Returns:
             list[SdoData]: the SDO metadata of the dates of interest.
         """
-
         return self._all_sdo_metadata
-    
+
     @Decorators.running_time
     def _fetch_all_dates(self) -> list[SdoData]:
         """

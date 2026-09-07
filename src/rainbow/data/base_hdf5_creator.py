@@ -150,7 +150,7 @@ class BaseHdf5Creator:
                 "of not of type dict[str, str] then a 'name' argument for the dataset has to be "
                 "given. "
             )
-        
+
         # DATASET create
         if (key != ''):
             # SELECT dataset
@@ -219,7 +219,7 @@ class BaseHDF5Protuberance(BaseHdf5Creator):
         self.solar_r = 6.96e5  # in km
 
         # PLACEHOLDERs
-        self.volume: VolumeInfo  # todo change this as a placeholder doesn't make sense.
+        self.volume: VolumeInfo
 
     def create_borders(
             self,
@@ -265,7 +265,7 @@ class BaseHDF5Protuberance(BaseHdf5Creator):
             },
         }
         return info
-    
+
     def add_cube(
             self,
             group: h5py.File | h5py.Group,
@@ -291,7 +291,7 @@ class BaseHDF5Protuberance(BaseHdf5Creator):
         Returns:
             h5py.File | h5py.Group: the updated file or group.
         """
-        
+
         raw = {
             'description': "Default",
             'coords': {
@@ -318,7 +318,7 @@ class BaseHDF5Protuberance(BaseHdf5Creator):
         # ADD group
         self.add_group(group, raw, data_name)
         return group
-    
+
     def to_index_pos(self, coords: np.ndarray, unique: bool = False) -> tuple[np.ndarray, dict]:
         """
         Converts the coordinates from km to indexes and returns the indexes with the new borders.
@@ -361,6 +361,6 @@ class BaseHDF5Protuberance(BaseHdf5Creator):
         dx_dict = {
             'data': self.volume.dx,  # ? maybe let dx be a method argument
             'unit': 'km',
-            'description': "The voxel resolution in kilometres.",
+            'description': "The voxel resolution in kilometers.",
         }
         return dx_dict

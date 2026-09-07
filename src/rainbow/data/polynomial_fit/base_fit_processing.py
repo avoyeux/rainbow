@@ -30,9 +30,9 @@ class BaseFitProcessing:
     polar_r_normalized: np.ndarray = field(init=False)
     polar_theta_normalized: np.ndarray = field(init=False)
 
-    def normalise_coords(self) -> None:
+    def normalize_coords(self) -> None:
         """
-        Normalise the coordinates so that they are between 0 and 1. As such, the cumulative
+        Normalize the coordinates so that they are between 0 and 1. As such, the cumulative
         distance won't only depend on one axis.
         """
 

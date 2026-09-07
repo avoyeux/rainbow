@@ -7,6 +7,7 @@ from __future__ import annotations
 # IMPORTS standard
 import multiprocessing as mp
 from dataclasses import dataclass, field
+from functools import partial
 
 # IMPORTs third-party
 import h5py
@@ -63,6 +64,30 @@ class AxesOrder:
             self.axes_order = [2, 1, 0]
         else:
             raise ValueError(f"\033[1;31mThe shape {self.coords_shape} is not recognised.\033[0m")
+
+
+def nth_order_polynomial(order: int, t: np.ndarray, *coeffs: int | float) -> np.ndarray:
+    """
+    Polynomial function given an order, a 1D ndarray and the polynomial coefficients. Defined at
+    module level (with the order as first argument) so that it can be pickled when passed through
+    functools.partial to the multiprocessing subprocesses.
+
+    Args:
+        order (int): the polynomial order.
+        t (np.ndarray): the 1D array for which you want the polynomial results.
+        coeffs (int | float): the coefficient(s) for the polynomial in the order a_0 + a_1 * t
+            a_2 * t**2 + ...
+
+    Returns:
+        np.ndarray: the polynomial results.
+    """
+
+    # INIT
+    result: np.ndarray = cast(np.ndarray, 0)
+
+    # POLYNOMIAL
+    for i in range(order + 1): result += coeffs[i] * t**i
+    return result
 
 
 class Polynomial:
@@ -440,7 +465,7 @@ class Polynomial:
                         (coords_section[a, i] - coords_section[a, i - 1])**2 
                         for a in range(3)
                     ]))
-                t /= t[-1]  # normalisation 
+                t /= t[-1]  # normalization 
 
                 # RESULTs formatting
                 kwargs = {
@@ -648,34 +673,17 @@ class Polynomial:
 
     def generate_nth_order_polynomial(
             self,
-        ) -> Callable[[np.ndarray, int | float], np.ndarray]:  # ! the type annotation is wrong
+        ) -> Callable[..., np.ndarray]:
         """
-        To generate a polynomial function given a polynomial order.
+        To generate a polynomial function given a polynomial order. The returned function is a
+        functools.partial over the module-level ``nth_order_polynomial`` function so that it stays
+        picklable and can be sent to the multiprocessing subprocesses.
 
         Returns:
-            typing.Callable[[np.ndarray, tuple[int | float, ...]], np.ndarray]: the polynomial
-                function.
+            typing.Callable[..., np.ndarray]: the polynomial function.
         """
-        
-        def nth_order_polynomial(t: np.ndarray, *coeffs: int | float) -> np.ndarray:
-            """
-            Polynomial function given a 1D ndarray and the polynomial coefficients. The polynomial
-            order is defined before hand.
 
-            Args:
-                t (np.ndarray): the 1D array for which you want the polynomial results.
-
-            Returns:
-                np.ndarray: the polynomial results.
-            """
-
-            # Initialization
-            result: np.ndarray = cast(np.ndarray, 0)
-
-            # Calculating the polynomial
-            for i in range(self.poly_order + 1): result += coeffs[i] * t**i
-            return result
-        return nth_order_polynomial
+        return partial(nth_order_polynomial, self.poly_order)
     
 
 @dataclass(slots=True, repr=False, eq=False)
