@@ -1,0 +1,19 @@
+# KEYWORD ARGUMENTs for the hdf5 command.
+
+filename: 'data.h5'
+integration_time: [24]
+polynomial_points: 1_000_000
+polynomial_order: [4]
+feet_lon_lat: [[-177, 14.5], [-163.5, 16.5]]
+feet_sigma: 1.e-4
+south_leg_sigma: 5
+leg_threshold: 0.03
+full: false
+no_feet: True
+
+# CONFIG
+compression: true
+compression_lvl: 9
+processes: 1
+verbose: 0
+flush: false
