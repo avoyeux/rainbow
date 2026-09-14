@@ -62,7 +62,7 @@ def default_args(
 
     # YAML initialization
     params: dict[str, Any] = {}
-    if os.path.exists(yaml_path):
+    if os.path.isfile(yaml_path):
         with open(args.yaml, 'r') as f: params = yaml.safe_load(f)
     else:
         print(f'No yaml file found at {yaml_path}, using function defaults for other arguments.')

@@ -165,7 +165,7 @@ class DataSaver(BaseHDF5Protuberance):
             dict[str, str]: the directory paths.
         """
 
-        # PATHs keep
+        # PATHs keep  # todo check if the paths are still correct
         paths = {
             'cubes': config.path.dir.data.cubes.karine,
             'intensities': config.path.dir.data.stereo.int,
