@@ -12,10 +12,9 @@ import argparse
 import yaml
 
 # IMPORTs personal
-from common import Decorators
+from common import Decorators, root_path
 
 # IMPORTs local
-from .config import config
 from .commands import DataSaver
 
 # TYPE ANNOTATIONs
@@ -84,7 +83,10 @@ def create() -> None:
     parser = argparse.ArgumentParser(description='Create the HDF5 data file.')
 
     # KWARGs
-    params = default_args(parser, config.file.config.hdf5)
+    params = default_args(
+        parser=parser,
+        yaml_path=os.path.join(root_path, 'config', 'create.yml'),
+    )
 
     # RUN
     DataSaver(**params)

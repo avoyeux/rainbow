@@ -8,7 +8,7 @@ project:
     description: "3D visualization and re-projection of a solar protuberance."
 
 # ROOTPATH project
-root_path: &root !rootpath  # setting the root path dynamically
+root_path: &root !rootpath  # dynamic root path (where virtual env is)
 
 # PATHs
 dir:
@@ -17,20 +17,20 @@ dir:
     temporary: !join [*_dir, 'temporary']
 
     input:
-        path: &input !join [*_dir, 'input']
+        path: &_input !join [*_dir, 'input']
 
-        texture: !join [*input, 'texture']
-        cubes: !join [*input, 'cubes']
-        envelope: !join [*input, 'envelope']
+        texture: !join [*_input, 'texture']
+        cubes: !join [*_input, 'cubes']
+        envelope: !join [*_input, 'envelope']
 
         sdo:  # todo check if png path needed here or in 'output'
-            _path: &_sdo !join [*input, 'sdo']
+            _path: &_sdo !join [*_input, 'sdo']
 
             fits: *_sdo
             png: !join [*_sdo, 'png']
 
         stereo:
-            _path: &_stereo !join [*input, 'stereo']
+            _path: &_stereo !join [*_input, 'stereo']
 
             avg: !join [*_stereo, 'avg']
             int: !join [*_stereo, 'int']
@@ -65,4 +65,5 @@ dir:
                 integration: !join [*_projection, 'integration']
 
 file:
-    timestamps: !join [*input, 'SDO_timestamps.txt']
+    stereo_info: !join [*_stereo, 'stereo_304.save']
+    timestamps: !join [*_input, 'SDO_timestamps.txt']

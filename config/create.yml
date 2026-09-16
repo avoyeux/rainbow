@@ -14,6 +14,6 @@ no_feet: True
 # CONFIG
 compression: true
 compression_lvl: 9
-processes: 1
-verbose: 0
+processes: 20
+verbose: 10
 flush: false

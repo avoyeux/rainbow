@@ -50,6 +50,7 @@ __all__ = ['DataSaver']
 
 # todo change the code so each cube processing is done in a separate process
 # todo descriptions change as dates changed and (e.g. raw data) most cube indexes contain no data
+# todo find a solution for SDO positions (probably fitting after opening the data or something).
 
 
 
@@ -165,13 +166,13 @@ class DataSaver(BaseHDF5Protuberance):
             dict[str, str]: the directory paths.
         """
 
-        # PATHs keep  # todo check if the paths are still correct
+        # PATHs
         paths = {
-            'cubes': config.path.dir.data.cubes.karine,
-            'intensities': config.path.dir.data.stereo.int,
-            'sdo': config.path.dir.data.sdo,
-            'stereo info': config.path.data.stereob_info,
-            'save': config.path.dir.data.hdf5,
+            'cubes': config.dir.input.cubes,
+            'intensities': config.dir.input.stereo.int,
+            'sdo': config.dir.input.sdo.fits,
+            'stereo info': config.file.stereo_info,
+            'save': config.output.hdf5,
         }
         return paths
 
