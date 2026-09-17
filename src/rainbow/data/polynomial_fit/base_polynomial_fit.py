@@ -63,7 +63,7 @@ class AxesOrder:
         elif self.coords_shape[0] == 3:
             self.axes_order = [2, 1, 0]
         else:
-            raise ValueError(f"\033[1;31mThe shape {self.coords_shape} is not recognised.\033[0m")
+            raise ValueError(f"\033[1;31mThe shape {self.coords_shape} is not recognized.\033[0m")
 
 
 def nth_order_polynomial(order: int, t: np.ndarray, *coeffs: int | float) -> np.ndarray:
@@ -105,11 +105,12 @@ class Polynomial:
             processes: int, 
             precision_nb: int = int(1e6), 
             full: bool = False,
-            verbose: int | None = None,
-            flush: bool | None = None,
+            verbose: int = 0,
+            flush: bool = False,
         ) -> None:
         """
-        Initialisation of the Polynomial class. Using the get_information() instance method, you
+        todo update docstring
+        Initialization of the Polynomial class. Using the get_information() instance method, you
         can get the curve position voxels and the corresponding n-th order polynomial parameters
         with their explanations inside a dict[str, str | dict[str, str | np.ndarray]].
 
@@ -133,8 +134,8 @@ class Polynomial:
         """
 
         # CONFIG attributes
-        self.verbose: int = config.run.verbose if verbose is None else verbose
-        self.flush: bool = config.run.flush if flush is None else flush
+        self.verbose = verbose
+        self.flush = flush
 
         # AXES ORDER init
         self.axes_order = AxesOrder(data.coords.shape).axes_order
@@ -233,7 +234,7 @@ class Polynomial:
             }
             information |= raw_coords 
         return information
-    
+
     @Decorators.running_time
     def no_duplicates_data(self, data: np.ndarray) -> np.ndarray:
         """
@@ -321,7 +322,7 @@ class Polynomial:
 
         # CLOSE shared memory
         shm.close()
-        
+
     @Decorators.running_time
     def get_data(self) -> tuple[np.ndarray, np.ndarray]:
         """
@@ -423,7 +424,7 @@ class Polynomial:
             output_queue (mp.queues.Queue): the output_queue to save the results.
             kwargs_sub (dict[str, Any]): the kwargs for the polynomial_fit function.
         """
-        
+
         # DATA open
         shm_coords, coords = Shared.open(coords_dict)
         shm_sigma, sigma = Shared.open(sigma_dict)
@@ -465,16 +466,21 @@ class Polynomial:
                         (coords_section[a, i] - coords_section[a, i - 1])**2 
                         for a in range(3)
                     ]))
-                t /= t[-1]  # normalization 
+                # CHECK degenerate case (all voxels at the same position)
+                if t[-1] <= 0:
+                    result = np.empty((3, 0))
+                    params = np.empty((3, 0))
+                else:
+                    t /= t[-1]  # normalization 
 
-                # RESULTs formatting
-                kwargs = {
-                    'coords': coords_section,
-                    'sigma': sigma_section,
-                    't': t,
-                }
-                result, params = Polynomial.polynomial_fit(**kwargs, **kwargs_sub)  #type:ignore
-            
+                    # RESULTs formatting
+                    kwargs = {
+                        'coords': coords_section,
+                        'sigma': sigma_section,
+                        't': t,
+                    }
+                    result, params = Polynomial.polynomial_fit(**kwargs, **kwargs_sub)  #type:ignore
+
             # SAVE results
             if coords.shape[0] == 4:
                 output_queue.put((
@@ -484,7 +490,7 @@ class Polynomial:
                 ))
             else:
                 output_queue.put((0, result, params))
-        
+
         shm_coords.close()
         shm_sigma.close()
 
@@ -633,43 +639,44 @@ class Polynomial:
             np.ndarray: the coefficients (params_x, params_y, params_z) of the polynomial.
         """
 
-        # DATA formatting
-        kwargs = {
-            'polynomial': polynomial,
-            't': t, 
-            't_mask': t_mask,
-            'coords': coords,
-            'params_init': params_init,
-            'sigma': sigma,
-            'feet_mask': feet_mask,
-            'south_sigma': south_sigma,
-        }
-        try: 
-            # FITTING
-            sigma[feet_mask] = feet_sigma
-            x, y, z = coords
-            params_x, _ = scipy.optimize.curve_fit(polynomial, t, x, p0=params_init)
+        # FITTING (bounded retries instead of unbounded recursion)
+        x, y, z = coords
+        for _ in range(10):
+            try:
+                sigma[feet_mask] = feet_sigma
+                sigma[~feet_mask] = 20
+                sigma[t_mask] = south_sigma
 
-            sigma[~feet_mask] = 20
-            sigma[t_mask] = south_sigma
-            params_y, _ = scipy.optimize.curve_fit(polynomial, t, y, p0=params_init)
-            params_z, _ = scipy.optimize.curve_fit(polynomial, t, z, p0=params_init)
-            params = np.stack([params_x, params_y, params_z], axis=0).astype('float64')
-        
-        except Exception:
-            # FITTING failed
-            feet_sigma *= 4
-
-            if verbose > 1:
-                print(
-                    "\033[1;31mThe curve_fit didn't work. Multiplying the value of the feet by 4, "
-                    f"i.e. value is {feet_sigma}.\033[0m",
-                    flush=flush,
+                # FITTING
+                params_x, _ = scipy.optimize.curve_fit(
+                    polynomial, t, x, p0=params_init, sigma=sigma,
                 )
-            params = Polynomial.scipy_curve_fit(feet_sigma=feet_sigma, **kwargs)  #type:ignore
+                params_y, _ = scipy.optimize.curve_fit(
+                    polynomial, t, y, p0=params_init, sigma=sigma,
+                )
+                params_z, _ = scipy.optimize.curve_fit(
+                    polynomial, t, z, p0=params_init, sigma=sigma,
+                )
+                return np.stack([params_x, params_y, params_z], axis=0).astype('float64')
 
-        finally:
-            return params
+            except Exception:
+                # FITTING failed
+                feet_sigma *= 4
+
+                if verbose > 1:
+                    print(
+                        "\033[1;31mThe curve_fit didn't work. Multiplying the value of the feet "
+                        f"by 4, i.e. value is {feet_sigma}.\033[0m",
+                        flush=flush,
+                    )
+
+        # FITTING gave up
+        if verbose > 0:
+            print(
+                "\033[1;31mThe curve_fit failed 10 times, skipping this cube.\033[0m",
+                flush=flush,
+            )
+        return np.empty((3, 0))
 
     def generate_nth_order_polynomial(
             self,
@@ -684,7 +691,7 @@ class Polynomial:
         """
 
         return partial(nth_order_polynomial, self.poly_order)
-    
+
 
 @dataclass(slots=True, repr=False, eq=False)
 class HDF5GroupPolynomialInformation:
@@ -866,7 +873,7 @@ class GetPolynomialFit:
         y = self.nth_order_polynomial(self.t_fine, *params_y)
         z = self.nth_order_polynomial(self.t_fine, *params_z)
         return np.stack([x, y, z], axis=0)
-    
+
     def close(self):
         """
         To close the HDF5 file pointer.

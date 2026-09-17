@@ -142,6 +142,8 @@ class DataSaver(BaseHDF5Protuberance):
         self.leg_threshold = leg_threshold
         self.full = full  # deciding to add the heavy sky coords arrays.
         self.no_feet = no_feet
+        self.verbose = verbose
+        self.flush = flush
 
         # PLACEHOLDERs
         self.dx: dict[str, str | float]  # information and value of the spatial resolution
@@ -172,7 +174,7 @@ class DataSaver(BaseHDF5Protuberance):
             'intensities': config.dir.input.stereo.int,
             'sdo': config.dir.input.sdo.fits,
             'stereo info': config.file.stereo_info,
-            'save': config.output.hdf5,
+            'save': config.dir.output.hdf5,
         }
         return paths
 
@@ -262,7 +264,7 @@ class DataSaver(BaseHDF5Protuberance):
             for filepath in stereo_filepaths
             if (matched := self.date_pattern.match(os.path.basename(filepath))) is not None
         }
-        
+
         # DATEs of initial cubes
         cube_dates = [cube_to_date[index] for index in cube_indexes]
 
@@ -383,7 +385,7 @@ class DataSaver(BaseHDF5Protuberance):
                 "the 'Dates' dataset."
             ),
         }
-        
+
         # SAVE reformat
         information = {
             'Time indexes': cube_numbers_info,
@@ -391,7 +393,7 @@ class DataSaver(BaseHDF5Protuberance):
             'IAS paths': ias_path_info,
         }
         return information
-    
+
     @Decorators.running_time
     def _create(self) -> None:
         """
@@ -510,7 +512,7 @@ class DataSaver(BaseHDF5Protuberance):
             'Leg sigma': leg_sigma,
         }
         return information
-    
+
     @Decorators.running_time
     def get_pos_sdo_info(self) -> dict[str, str | np.ndarray]:
         """
@@ -537,7 +539,7 @@ class DataSaver(BaseHDF5Protuberance):
             ),
         }
         return information
-    
+
     @Decorators.running_time
     def get_pos_stereo_info(self) -> dict[str, str | np.ndarray]:
         """
@@ -565,7 +567,7 @@ class DataSaver(BaseHDF5Protuberance):
                 "heliocentric coordinates.\nThe shape of the data is (413, 3) where 413 "
                 "represents the time indexes for the data and the 3 the x, y, z position of the "
                 "satellite."
-            ),          
+            ),
         }
         return information
 
@@ -611,7 +613,7 @@ class DataSaver(BaseHDF5Protuberance):
             coordinates_list[identifier] = result
         coordinates: np.ndarray = np.stack(coordinates_list, axis=0)
         return coordinates
-    
+
     @staticmethod
     def get_pos_sdo_sub(
             input_queue: QueueType[tuple[int, str] | None],
@@ -672,7 +674,7 @@ class DataSaver(BaseHDF5Protuberance):
             arguments = input_queue.get()
             if arguments is None: return
             identification, information_recarray = arguments
-            
+
             # DATA
             date = CustomDate(information_recarray.strdate)
             stereo_date = (
@@ -775,7 +777,7 @@ class DataSaver(BaseHDF5Protuberance):
                     "The initial data with the feet positions added saved as Carrington "
                     "Heliographic Coordinates in km."
                 )
-    
+
     @Decorators.running_time
     def filtered_group(
             self,
@@ -875,7 +877,7 @@ class DataSaver(BaseHDF5Protuberance):
                 "the rainbow cube data. The limits of the borders are defined in the .save IDL "
                 "code named new_toto.pro created by Dr. Frederic Auchere."
             )
-    
+
     @Decorators.running_time
     def integrated_group(
             self,
@@ -935,7 +937,7 @@ class DataSaver(BaseHDF5Protuberance):
             inside_group[group_name].attrs['description'] = (
                 f"This group contains the {option.lower()} data fully integrated."
             )
-            
+
             # INTEGRATION time dependent
             for integration_time in self.integration_time:
                 # INTEGRATION setup
@@ -961,7 +963,7 @@ class DataSaver(BaseHDF5Protuberance):
                 inside_group[group_name].attrs['description'] = (
                     f"This group contains the {option.lower()} data integrated on {time_hours} "
                     "hours intervals."
-                )              
+                )
 
     def full_integration(
             self,
@@ -1041,7 +1043,7 @@ class DataSaver(BaseHDF5Protuberance):
             p.start()
             processes[i] = p
         for p in processes: p.join()
-        
+
         # RESULTs formatting 
         data_list: list[sparse.COO] = cast(list[sparse.COO], [None] * self.max_len)
         while not output_queue.empty():
@@ -1133,7 +1135,7 @@ class DataSaver(BaseHDF5Protuberance):
         else:
             COO: sparse.COO = cast(sparse.COO, sparse.stack(chunk, axis=0))
             return sparse.COO.any(COO, axis=0)
-    
+
     @staticmethod
     def get_COO(H5PYFile: h5py.File, group_path: str) -> sparse.COO:
         """
@@ -1152,7 +1154,7 @@ class DataSaver(BaseHDF5Protuberance):
         data_shape = np.max(data_coords, axis=1) + 1
         result = sparse.COO(coords=data_coords, data=data_data, shape=data_shape)
         return result
-    
+
     @Decorators.running_time
     def polynomial_group(self, H5PYFile: h5py.File) -> None:
         """
@@ -1161,7 +1163,7 @@ class DataSaver(BaseHDF5Protuberance):
         Args:
             H5PYFile (h5py.File): the file object.
         """
-        
+
         # OPTIONs
         data_options = [
             f'{data_type}{feet}'
@@ -1237,7 +1239,7 @@ class DataSaver(BaseHDF5Protuberance):
         ]
         rawCubes: sparse.COO = cast(sparse.COO, sparse.stack(rawCubes_list, axis=0))
         return rawCubes
-    
+
     @staticmethod
     def raw_cubes_sub(
             input_queue: QueueType[tuple[int, str] | None],
@@ -1294,7 +1296,7 @@ class DataSaver(BaseHDF5Protuberance):
         # the .to_numpy() method wasn't used as the idx_type argument isn't working properly
         sparse_cubes.coords = sparse_cubes.coords.astype('uint16')  # to save RAM
         return sparse_cubes
-    
+
     def add_sky_coords(
             self,
             group: h5py.File | h5py.Group,
@@ -1316,7 +1318,7 @@ class DataSaver(BaseHDF5Protuberance):
         Returns:
             h5py.File | h5py.Group: the updated group.
         """
-        
+
         # SKY COORDs setup
         sky_coords = self.carrington_skyCoords(data, borders)
         data_list: list[np.ndarray] = cast(list[np.ndarray], [None] * len(sky_coords))
@@ -1345,14 +1347,14 @@ class DataSaver(BaseHDF5Protuberance):
                 ),
             },
         }
-        
+
         # BORDERs add
         raw |= borders  #type:ignore
 
         # ADD group
         self.add_group(group, raw, data_name)
         return group
-    
+
     def add_polynomial(self, group: h5py.Group, data: sparse.COO) -> None:
         """
         To add to an h5py.Group, the polynomial curve and parameters given the data to fit.
@@ -1373,15 +1375,17 @@ class DataSaver(BaseHDF5Protuberance):
             'processes': self.processes,  # ? why not nb_processes and processes ???
             'precision_nb': self.polynomial_points,
             'full': self.full,
+            'verbose': self.verbose,
+            'flush': self.flush,
         }
 
         # N-ORDERs 
         for n_order in self.polynomial_order:
-            instance = Polynomial(order=n_order, **polynomial_kwargs)  #type:ignore
+            instance = Polynomial(order=n_order, **polynomial_kwargs)
 
             info = instance.get_information()
             self.add_group(group, info, f'{n_order}th order polynomial')
-    
+
     def with_feet(
             self,
             data: sparse.COO,
@@ -1504,7 +1508,7 @@ class DataSaver(BaseHDF5Protuberance):
             identifier, result = output_queue.get()
             all_SkyCoords[identifier] = result
         return all_SkyCoords
-    
+
     @staticmethod
     def skyCoords_slice(
             coords_dict: dict[str, Any],
@@ -1535,7 +1539,7 @@ class DataSaver(BaseHDF5Protuberance):
             # DATA section
             slice_filter: np.ndarray = (coords[0, :] == index)
             cube: np.ndarray = coords[:, slice_filter]
-            
+
             # COORDs re-projected carrington
             skyCoord = astropy.coordinates.SkyCoord(
                 cube[1, :], cube[2, :], cube[3, :], 

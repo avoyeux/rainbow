@@ -1,7 +1,7 @@
 # KEYWORD ARGUMENTs for the hdf5 command.
 
 filename: 'data.h5'
-integration_time: [24]
+integration_time: [6]
 polynomial_points: 1_000_000
 polynomial_order: [4]
 feet_lon_lat: [[-177, 14.5], [-163.5, 16.5]]
@@ -14,6 +14,6 @@ no_feet: True
 # CONFIG
 compression: true
 compression_lvl: 9
-processes: 20
+processes: 32
 verbose: 10
 flush: false

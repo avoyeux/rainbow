@@ -100,7 +100,7 @@ class AllSDOMetadata:
         # ! need to check for the exception dates if it still applies to the fetched data
 
         # TIMESTAMPs get
-        with open(config.path.data.sdo_timestamp, 'r') as files:
+        with open(config.file.timestamps, 'r') as files:
             strings = files.read().splitlines()
         dates_list = [s.split(" ; ")[1][:-3] for s in strings]
 

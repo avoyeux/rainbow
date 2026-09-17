@@ -31,4 +31,4 @@ echo "Current working directory is `pwd`"
 source /home/avoyeux/.bashrc
 source /home/avoyeux/rainbow/.venv/bin/activate
 uv run python --version
-uv run python -m rainbow.commands.hdf5
+uv run create
