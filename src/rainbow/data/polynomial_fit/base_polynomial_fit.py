@@ -375,7 +375,7 @@ class Polynomial:
         }
 
         # RUN processes
-        processes: list[mp.Process] = cast(list[mp.Process], [None] * process_nb) 
+        processes: list[mp.Process] = [None] * process_nb  #type:ignore
         for i in range(process_nb):
             p = mp.Process(
                 target=self.get_data_sub,
@@ -388,8 +388,8 @@ class Polynomial:
         shm_sigma.unlink()
 
         # RESULTs formatting
-        parameters_list: list[np.ndarray] = cast(list[np.ndarray], [None] * self.time_len)
-        polynomials_list: list[np.ndarray] = cast(list[np.ndarray], [None] * self.time_len)
+        parameters_list: list[np.ndarray] = [None] * self.time_len  #type:ignore
+        polynomials_list: list[np.ndarray] = [None] * self.time_len  #type:ignore
         while not output_queue.empty():
             identifier, fit, params = output_queue.get()
             polynomials_list[identifier] = fit
@@ -490,7 +490,6 @@ class Polynomial:
                 ))
             else:
                 output_queue.put((0, result, params))
-
         shm_coords.close()
         shm_sigma.close()
 

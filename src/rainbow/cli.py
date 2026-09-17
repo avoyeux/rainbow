@@ -50,11 +50,13 @@ def default_args(
     parser.add_argument(
         '--verbose',
         type=int,
+        default=argparse.SUPPRESS,
         help='Verbosity level for the prints.',
     )
     parser.add_argument(
         '--flush',
         type=bool,
+        default=argparse.SUPPRESS,
         help='Whether to flush the print outputs.',
     )
     args = parser.parse_args()
