@@ -5,7 +5,6 @@ from __future__ import annotations
 
 # TYPE ANNOTATIONs
 from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
     # IMPORTs standard
     import queue

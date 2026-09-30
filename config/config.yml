@@ -67,3 +67,7 @@ dir:
 file:
     stereo_info: !join [*_stereo, 'stereo_304.save']
     timestamps: !join [*_input, 'SDO_timestamps.txt']
+
+    # Commands
+    _path: &_config !join [*root, 'config']
+    create: !join [*_config, 'create.yml']
