@@ -1,6 +1,6 @@
 """
 Creates figures, and the corresponding GIF, for the STEREO images with the contours of the mask.
-Also adds the gridlines showing the latitude and longitude.
+Also adds the grid-lines showing the latitude and longitude.
 It's quite an old code so needs a lot of improvements. Will change it when I use it again.
 """
 
@@ -17,7 +17,11 @@ from glob import glob
 from astropy.io import fits
 
 # Personal libraries
-from common import Decorators, Plot, SSHMirroredFilesystem
+from common import Decorators, Plot
+from common.server_connection import SSHMirroredFilesystem
+
+# IMPORTs local
+from ..config import config
 
 
 class ForPlotting:
@@ -61,7 +65,7 @@ class ForPlotting:
                 break
             first_pos += dx
 
-        # Getting the rest of the gridline positions
+        # Getting the rest of the grid-line positions
         positions = np.arange(img_index, image_shape[axis] + 0.1, deg_grid_width/dx, dtype='uint16')
         values = np.arange(round(first_pos, 2), \
                         first_pos + (len(positions) - 1) * deg_grid_width + 1e-4, deg_grid_width)
@@ -107,22 +111,22 @@ class FirstFigure:
     """
 
     @Decorators.running_time
-    def __init__(self, loncen=195, latcen=0, lonwidth=45, latwidth=45, dlon=0.075, dlat=0.075):
+    def __init__(self, lon_cen=195, lat_cen=0, lon_width=45, lat_width=45, d_lon=0.075, d_lat=0.075):
         # Image stats
-        self.loncen = loncen
-        self.latcen = latcen
-        self.lonwidth = lonwidth
-        self.latwidth = latwidth
-        self.dlon = dlon
-        self.dlat = dlat
+        self.lon_cen = lon_cen
+        self.lat_cen = lat_cen
+        self.lon_width = lon_width
+        self.lat_width = lat_width
+        self.d_lon = d_lon
+        self.d_lat = d_lat
 
-        # Initialisation 
-        self.Patterns()
-        self.Paths()
-        self.SDO_image_finder()
-        self.Data_fullnames()
+        # Initialization 
+        self.patterns()
+        self._paths()
+        self.sdo_image_finder()
+        self.data_full_names()
 
-    def Paths(self):
+    def _paths(self):
         """
         To create the paths to the files and to where we want to save the results 
         """
@@ -143,7 +147,7 @@ class FirstFigure:
         # Creating the upload path
         os.makedirs(self.paths['Plots'], exist_ok=True)
 
-    def Patterns(self):
+    def patterns(self):
         """
         Setting up the patterns so that I can match the MP4 images with the masks.
         """
@@ -160,7 +164,7 @@ class FirstFigure:
                                          \d{2}\.000\.png''', re.VERBOSE)
     
     @Decorators.running_time
-    def SDO_image_finder(self):
+    def sdo_image_finder(self):
         """
         To find the SDO image given its header timestamp and a list of corresponding paths to the corresponding fits file.
         """
@@ -186,9 +190,9 @@ class FirstFigure:
                 timestamp_to_path[timestamp[:-3]] = server.mirror(path + filepath_end, strip_level=1)
             server.close()
         self.sdo_timestamp = timestamp_to_path
-        
 
-    def Data_fullnames(self):
+
+    def data_full_names(self):
         """
         To get the path to each unique data element (e.g. image or masks) and the corresponding image
         number to then be able to correctly match them together. 
@@ -203,7 +207,10 @@ class FirstFigure:
         # Getting the corresponding image and mask numbers 
         mask_pattern = re.compile(r'frame(\d{4})\.png')
 
-        self.mask_numbers = [int(mask_pattern.match(os.path.basename(mask_name)).group(1)) for mask_name in self.mask_names]
+        self.mask_numbers = [
+            int(mask_pattern.match(os.path.basename(mask_name)).group(1)) #type:ignore
+            for mask_name in self.mask_names
+        ]  
 
     def Main_structure(self):
         """
@@ -292,8 +299,8 @@ class FirstFigure:
         Function to resize a given 2D np.ndarray.
         """
 
-        image = Image.fromarray(image)
-        image.resize(size, Image.Resampling.LANCZOS)
+        pil_image = Image.fromarray(image)
+        pil_image.resize(size, Image.Resampling.LANCZOS)
         return np.array(image)
 
     def Plotting_func(self, number, stereo_image, avg_image,  lines, loop):
@@ -305,20 +312,20 @@ class FirstFigure:
 
         # For the first image
         axs[0].imshow(stereo_image, interpolation='none')
-        ForPlotting.Grid_linesntext(axs[0], avg_image.shape, self.loncen, self.latcen, self.lonwidth, self.latwidth)
+        ForPlotting.Grid_linesntext(axs[0], avg_image.shape, self.lon_cen, self.lat_cen, self.lon_width, self.lat_width)
         axs[0].axis('off')
         axs[0].set_title(f'img{int(os.path.basename(self.image_names[number]).rstrip(".png"))}')
 
         # The contrast image 
         axs[1].imshow(avg_image, interpolation='none')
-        ForPlotting.Grid_linesntext(axs[1], avg_image.shape, self.loncen, self.latcen, self.lonwidth, self.latwidth)
+        ForPlotting.Grid_linesntext(axs[1], avg_image.shape, self.lon_cen, self.lat_cen, self.lon_width, self.lat_width)
         axs[1].axis('off')
         axs[1].set_title(f'avg{int(os.path.basename(self.avg_names[number]).rstrip(".png"))}')
         plt.tight_layout()
 
         # For the contrast with the mask lines
         axs[2].imshow(avg_image, interpolation='none')
-        ForPlotting.Grid_linesntext(axs[2], avg_image.shape, self.loncen, self.latcen, self.lonwidth, self.latwidth)
+        ForPlotting.Grid_linesntext(axs[2], avg_image.shape, self.lon_cen, self.lat_cen, self.lon_width, self.lat_width)
         
         for line in lines: axs[2].plot(line[1], line[0], color='r', linewidth=0.5, alpha=0.3)
         axs[2].axis('off')
@@ -357,8 +364,8 @@ class FirstFigure:
         tick_params_kwargs_bottom['bottom'] = False
         tick_params_kwargs_bottom['labelbottom'] = False
 
-        lon_positions, lon_text = ForPlotting.Grid_line_positions(self.loncen, self.lonwidth, stereo_image.shape, 1)
-        lat_positions, lat_text = ForPlotting.Grid_line_positions(self.latcen, self.latwidth, stereo_image.shape, 0)
+        lon_positions, lon_text = ForPlotting.Grid_line_positions(self.lon_cen, self.lon_width, stereo_image.shape, 1)
+        lat_positions, lat_text = ForPlotting.Grid_line_positions(self.lat_cen, self.lat_width, stereo_image.shape, 0)
 
         # Plotting the images
         axs[0, 0].imshow(stereo_image, interpolation='none')
@@ -426,38 +433,38 @@ class FirstFigure:
         return ax
 
 
-class GifMaker(FirstFigure):
-    """
-    Making the Gif using the created plots
-    """
+# class GifMaker(FirstFigure):
+#     """
+#     Making the Gif using the created plots
+#     """
 
-    def __init__(self, fps=0.8):
-        super().__init__()
-        self.fps = fps
-        self.Updating_paths()
+#     def __init__(self, fps=0.8):
+#         super().__init__()
+#         self.fps = fps
+#         self.Updating_paths()
 
-    def Updating_paths(self):
-        """
-        Updating the paths created in the main class.
-        """
+#     def Updating_paths(self):
+#         """
+#         Updating the paths created in the main class.
+#         """
 
-        self.paths['GIF'] = os.path.join(self.paths['Main'], 'GIF')
-        os.makedirs(self.paths['GIF'], exist_ok=True)
+#         self.paths['GIF'] = os.path.join(self.paths['Main'], 'GIF')
+#         os.makedirs(self.paths['GIF'], exist_ok=True)
 
-    def Creating_gif(self):
-        """
-        To create the gif using the plots from the main class
-        """
+#     def Creating_gif(self):
+#         """
+#         To create the gif using the plots from the main class
+#         """
 
-        import imageio
+#         import imageio
 
-        img_paths = [os.path.join(self.paths['Plots'], f'Plot_{number:04d}.png') for number in self.mask_numbers]
+#         img_paths = [os.path.join(self.paths['Plots'], f'Plot_{number:04d}.png') for number in self.mask_numbers]
 
-        with imageio.get_writer(os.path.join(self.paths['GIF'], 'the_gif.gif'), mode='I', duration=self.fps*1000) as writer:
-            for img_path in img_paths:
-                image = imageio.imread(img_path)
-                writer.append_data(image)
-        print('Gif is done')
+#         with imageio.get_writer(os.path.join(self.paths['GIF'], 'the_gif.gif'), mode='I', duration=self.fps*1000) as writer:
+#             for img_path in img_paths:
+#                 image = imageio.imread(img_path)
+#                 writer.append_data(image)
+#         print('Gif is done')
 
 
 if __name__ == '__main__':

@@ -210,15 +210,15 @@ class SDOProject(OrthographicalProjection):
         from matplotlib.lines import Line2D
         handles, labels = plt.gca().get_legend_handles_labels()
         wanted = []
-        colours = {}
+        colors = {}
         if self.plot_choices['envelope']:
             wanted += ['Middle path', 'Envelope']
-            colours['Middle path'] = 'blue'
-            colours['Envelope'] = 'black'
+            colors['Middle path'] = 'blue'
+            colors['Envelope'] = 'black'
         if self.plot_choices['sdo mask']:
             wanted.append('SDO mask contours')
             if projection_data.sdo_mask is not None:
-                colours['SDO mask contours'] = projection_data.sdo_mask.colour
+                colors['SDO mask contours'] = projection_data.sdo_mask.colour
         for choice, proj in [
             ('all data', projection_data.all_data),
             ('no duplicates', projection_data.no_duplicates),
@@ -228,17 +228,17 @@ class SDOProject(OrthographicalProjection):
             ('test cube', projection_data.test_cube),
         ]:
             if self.plot_choices[choice]:
-                name = proj.name + ' contour'
+                name = proj.name + ' contour' #type:ignore # ! check what the type problem is
                 wanted.append(name)
                 if proj is not None:
-                    colours[name] = proj.colour
+                    colors[name] = proj.colour
         final_handles = []
         for name in wanted:
             found = [h for h, l in zip(handles, labels) if l == name]
             if found:
                 final_handles.append(found[0])
             else:
-                final_handles.append(Line2D([], [], color=colours.get(name, 'none')))
+                final_handles.append(Line2D([], [], color=colors.get(name, 'none')))
         plt.legend(final_handles, wanted, loc='upper right')
 
         # PLOT save
