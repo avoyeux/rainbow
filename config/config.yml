@@ -40,7 +40,7 @@ dir:
     output:
         _path: &_output !join [*_dir, 'output']
 
-        hdf5: !join [*_output, 'hdf5']
+        hdf5: &_hdf5 !join [*_output, 'hdf5']
         mp4_saves: !join [*_output, 'mp4_saves']
 
         results:
@@ -67,7 +67,9 @@ dir:
 file:
     stereo_info: !join [*_stereo, 'stereo_304.save']
     timestamps: !join [*_input, 'SDO_timestamps.txt']
+    data: !join [*_hdf5, 'data.h5']
 
     # Commands
     _path: &_config !join [*root, 'config']
     create: !join [*_config, 'create.yml']
+    vis: !join [*_config, 'vis.yml']

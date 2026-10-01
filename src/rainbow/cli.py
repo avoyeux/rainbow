@@ -16,14 +16,14 @@ from common import Decorators
 
 # IMPORTs local
 from .config import config
-from .commands import DataSaver
+from .commands import DataSaver, K3dAnimation
 
 # TYPE ANNOTATIONs
 from typing import Any, TYPE_CHECKING
 if TYPE_CHECKING: from argparse import Namespace
 
 # API public
-__all__ = ['create']
+__all__ = ['create', 'vis']
 
 
 
@@ -82,7 +82,7 @@ def create() -> None:
     ? should I add more arguments ?
     """
 
-    print('\033[1;0mCreating the HDF5 data file...\033[0m')
+    print('\033[1;0mCreating the HDF5 data file...\033[0m', flush=True)
     parser = argparse.ArgumentParser(description='Create the HDF5 data file.')
 
     # KWARGs
@@ -90,3 +90,17 @@ def create() -> None:
 
     # RUN
     DataSaver(**params)
+
+
+@Decorators.running_time
+def vis() -> None:
+    # todo add docstring
+
+    print('\033[1;0mStarting 3D visualization...\033[0m', flush=True)
+    parser = argparse.ArgumentParser(description='3D visualization.')
+
+    # KWARGs
+    params = default_args(parser, config.file.vis)
+
+    # RUN
+    K3dAnimation(**params)

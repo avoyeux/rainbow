@@ -1,0 +1,16 @@
+# KEYWORD ARGUMENTs for the jupyter-notebook visualization.
+
+time_interval: 6
+polynomial_order:
+  - 4
+choices: 
+  - 'all dates'
+  - 'sun'
+  - 'no duplicate integration'
+  - 'pov sdo'
+  - 'fit'
+
+# CONFIG
+compression_level: 9
+verbose: 0
+flush: false

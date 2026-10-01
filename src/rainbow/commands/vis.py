@@ -24,7 +24,7 @@ from common import Decorators, Plot
 
 # IMPORTs local
 from ..config import config
-from rainbow.animation.animation_dataclasses import (
+from ..animation.animation_dataclasses import (
     CubesData, CubesConstants, CubeInfo, FakeCubeInfo, UniqueCubeInfo,
     PolynomialData, UniquePolynomialData,
 )
@@ -77,6 +77,7 @@ class Setup:
             flush (int | None, optional): deciding to flush the buffer each time there is a print.
                 If None, it will use the config file. Defaults to None.
         """
+        print('here', flush=True)
 
         # CONSTANTs
         self._solar_r = 6.96e5
@@ -302,7 +303,7 @@ class Setup:
         """
 
         # FOV get
-        hdul = fits.open(os.path.join(config.dir.input.sdo, 'AIA_fullhead_000.fits.gz'))
+        hdul = fits.open(os.path.join(config.dir.input.sdo.fits, 'AIA_fullhead_000.fits.gz'))
         image_shape = hdul[0].data.shape
         fov_degrees = image_shape[0] * hdul[0].header['CDELT1'] / 3600
         hdul.close()
