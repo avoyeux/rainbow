@@ -9,6 +9,7 @@ import os
 # IMPORTs third-party
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 
 # IMPORTs local
 from ..projection.format_data import (
@@ -204,7 +205,41 @@ class SDOProject(OrthographicalProjection):
         plt.title(f"SDO polar projection - {process_constants.date}")
         plt.xlabel('Polar angle [degrees]')
         plt.ylabel('Radial distance [Mm]')
-        plt.legend(loc='upper right')
+
+        # STABLE legend (driven by plot_choices from project.yml)
+        from matplotlib.lines import Line2D
+        handles, labels = plt.gca().get_legend_handles_labels()
+        wanted = []
+        colours = {}
+        if self.plot_choices['envelope']:
+            wanted += ['Middle path', 'Envelope']
+            colours['Middle path'] = 'blue'
+            colours['Envelope'] = 'black'
+        if self.plot_choices['sdo mask']:
+            wanted.append('SDO mask contours')
+            if projection_data.sdo_mask is not None:
+                colours['SDO mask contours'] = projection_data.sdo_mask.colour
+        for choice, proj in [
+            ('all data', projection_data.all_data),
+            ('no duplicates', projection_data.no_duplicates),
+            ('full integration', projection_data.full_integration_no_duplicates),
+            ('line of sight', projection_data.line_of_sight),
+            ('fake data', projection_data.fake_data),
+            ('test cube', projection_data.test_cube),
+        ]:
+            if self.plot_choices[choice]:
+                name = proj.name + ' contour'
+                wanted.append(name)
+                if proj is not None:
+                    colours[name] = proj.colour
+        final_handles = []
+        for name in wanted:
+            found = [h for h, l in zip(handles, labels) if l == name]
+            if found:
+                final_handles.append(found[0])
+            else:
+                final_handles.append(Line2D([], [], color=colours.get(name, 'none')))
+        plt.legend(final_handles, wanted, loc='upper right')
 
         # PLOT save
         plot_name = f"re_projection_{process_constants.date}.png"
