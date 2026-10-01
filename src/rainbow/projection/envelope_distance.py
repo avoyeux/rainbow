@@ -11,7 +11,10 @@ import numpy as np
 from common import AnnotateAlongCurve
 
 # IMPORTs local
-from src.projection.format_data import FitEnvelopes
+from .format_data import FitEnvelopes
+
+# API public
+__all__ = ['EnvelopeDistanceAnnotation']
 
 
 

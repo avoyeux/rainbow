@@ -15,27 +15,25 @@ import h5py
 import numpy as np
 
 # IMPORTS personal
-from common import Decorators, Plot
+from common import Decorators, Plot, root_path
 
 # IMPORTs local
-from config import config
-from src.projection.format_data import (
+from ..config import config
+from .format_data import (
     GlobalConstants, ProcessConstants, ImageBorders, PolarImageInfo,
     ProjectionData, ProjectedData, CubeInformation, EnvelopeInformation,
     CubesPointers, DataPointer, UniqueDataPointer, FakeDataPointer, FitPointer, UniqueFitPointer,
     FitWithEnvelopes, WarpedDataGroup, AllWarpedInformation,
 )
-from src.projection.helpers.extract_envelope import ExtractEnvelope
-from src.projection.helpers.base_reprojection import BaseReprojection
-from src.projection.helpers.cartesian_to_polar import CartesianToPolar
-from src.projection.helpers.warped_information import AllWarpedTreatment
-from src.data.polynomial_fit.polynomial_reprojection import ReprojectionProcessedPolynomial
+from .helpers.extract_envelope import ExtractEnvelope
+from .helpers.base_reprojection import BaseReProjection
+from .helpers.cartesian_to_polar import CartesianToPolar
+from .helpers.warped_information import AllWarpedTreatment
+from ..data.polynomial_fit.polynomial_reprojection import ReProjectionProcessedPolynomial
 
 # TYPE ANNOTATIONs
-from typing import cast, overload, Literal, TYPE_CHECKING
-if TYPE_CHECKING:
-    import queue
-    type QueueAlias[T] = queue.Queue[T]  # used parent class
+from typing import cast, overload, Literal, Any, TYPE_CHECKING
+if TYPE_CHECKING: from ..typing import QueueType
 
 # API public
 __all__ = ['OrthographicalProjection']
@@ -49,7 +47,7 @@ __all__ = ['OrthographicalProjection']
 
 
 
-class OrthographicalProjection(BaseReprojection):
+class OrthographicalProjection(BaseReProjection):
     """
     Adds the protuberance voxels (with the corresponding polynomial fit) on SDO's image.
     Different choices are possible in what to plot in the final SDO image.
@@ -59,22 +57,22 @@ class OrthographicalProjection(BaseReprojection):
     @Decorators.running_time
     def __init__(
             self,
-            processes: int | None = None,
+            filepath: str = config.file.data,
             integration_time: list[int] = [24],
-            filepath: str | None = None,
             polynomial_order: list[int] = [4],
-            plot_choices: list[str] = [
+            choices: list[str] = [
                 'sdo image', 'no duplicates', 'envelope', 'polynomial', 'test data',
             ],
             arc_length_points: int = 1280,
             warp_pixel_interpolation_order: int = 3,
             warp_integration_type: Literal['mean', 'median'] = 'mean',
             with_feet: bool = False,
-            with_fake_data: bool = False,
-            verbose: int | None = None,
-            flush: bool | None = None,
+            processes: int = 1,
+            verbose: int = 0,
+            flush: bool = False,
         ) -> None:
         """
+        todo update docstring
         Re-projection of the computed 3D volume to recreate a 2D image of what is seen from SDO's
         POV.
         This is done to recreate the analysis of Dr. Auchere's paper; 'The coronal Monsoon'.
@@ -83,14 +81,14 @@ class OrthographicalProjection(BaseReprojection):
             processes (int | None, optional): the number of parallel processes used in the
                 multiprocessing. When None, uses the config file. Defaults to None.
             integration_time (list[int], optional): the integration time(s) used for the data to be
-                reprojected. Defaults to 24.
+                re-projected. Defaults to 24.
             filepath (str | None, optional): the filepath of the HDF5 containing all the relevant
                 3D data. When None, uses the config file. Defaults to None.
 
             polynomial_order (list[int], optional): the order(s) of the polynomial function(s) that
                 represent the fitting of the integrated 3D volume. Defaults to [4].
-            plot_choices (list[str], optional): the main choices that the user wants to be in the
-                reprojection. The possible choices are:
+            choices (list[str], optional): the main choices that the user wants to be in the
+                re-projection. The possible choices are:
                 ['full integration', 'integration',
                 'no duplicates', 'sdo image', 'sdo mask', 'test cube', 'fake data', 'envelope',
                 'fit', 'fit envelope', 'test data', 'line of sight', 'all data', 'warp']
@@ -102,8 +100,6 @@ class OrthographicalProjection(BaseReprojection):
             warp_integration_type (Literal['mean', 'median'], optional): the type of integration
                 used to compute the final warped image. Defaults to 'mean'.
             with_feet (bool, optional): deciding to use the data with or without added feet.
-                Defaults to False.
-            with_fake_data (bool, optional): if the input data is the fusion HDF5 file.
                 Defaults to False.
             verbose (int | None, optional): gives the verbosity in the outputted prints. The higher
                 the value, the more prints. Starts at 0 for no prints. When None, uses the config
@@ -117,13 +113,13 @@ class OrthographicalProjection(BaseReprojection):
         self._warped_information: AllWarpedInformation | None = None
 
         # CONFIG values
-        if processes is None:
-            self.processes: int = config.run.processes
+        self.processes = processes
+        self.verbose: int = verbose
+        self.flush: bool = flush
+        if any(name in root_path for name in ['Documents', 'Codes']):  # ! shitty patch, change it later
+            self.in_local = True
         else:
-            self.processes = processes if processes > 1 else 1
-        self.verbose: int = config.run.verbose if verbose is None else verbose
-        self.flush: bool = config.run.flush if flush is None else flush
-        self.in_local = True if 'Documents' in config.root_path else False
+            self.in_local = False
 
         # PARENT
         super().__init__()
@@ -134,6 +130,7 @@ class OrthographicalProjection(BaseReprojection):
             self.connection = SSHMirroredFilesystem(verbose=self.verbose)
 
         # CONSTANTs
+        self.filepath = filepath
         self.solar_r = 6.96e5  # in km
         self.projection_borders = ImageBorders(
             radial_distance=(690, 870),  # in Mm
@@ -144,15 +141,13 @@ class OrthographicalProjection(BaseReprojection):
         self.warp_pixel_interpolation_order = warp_pixel_interpolation_order
 
         # ATTRIBUTEs
-        self.with_fake_data = with_fake_data
-        self.plot_choices = self.plot_choices_creation(plot_choices)        
+        self.plot_choices = self.plot_choices_creation(choices)        
         self.integration_time = integration_time
         self.multiprocessing = True if self.processes > 1 else False
         self.polynomial_order = sorted(polynomial_order)
 
         # PATHs setup
         self.feet = ' with feet' if with_feet else ''
-        self.filepath = self.filepath_setup(filepath)
         self.foldername = (
             os.path.basename(self.filepath).split('.')[0] + ''.join(self.feet.split(' '))
         )
@@ -164,31 +159,12 @@ class OrthographicalProjection(BaseReprojection):
     @property
     def warped_information(self) -> AllWarpedInformation | None:
         """
-        To get the warped information after having initialised the class.
+        To get the warped information after having initialized the class.
 
         Returns:
             AllWarpedInformation | None: the totality of the warped information data.
         """
-
         return self._warped_information
-
-    def filepath_setup(self, filepath: str | None) -> str:
-        """
-        To setup the data filepath (using the config.yml file if filepath is None).
-
-        Args:
-            filepath (str | None): the filepath to the data.
-
-        Returns:
-            str: the real filepath to the data.
-        """
-
-        if filepath is None:
-            if self.with_fake_data:
-                filepath: str = config.path.data.fusion
-            else:
-                filepath: str = config.path.data.real
-        return filepath
 
     def path_setup(self) -> dict[str, str]:
         """
@@ -200,11 +176,11 @@ class OrthographicalProjection(BaseReprojection):
 
         # PATHs save
         paths = {
-            'sdo': config.path.dir.data.sdo,
-            'sdo times': config.path.data.sdo_timestamp,
+            'sdo': config.dir.input.sdo.fits,
+            'sdo times': config.file.timestamps,
             'save': os.path.join(
-                config.path.dir.data.result.projection,
-                self.foldername,
+                config.dir.output.results.projection.sdo,
+                self.foldername,  # ? why is the folder name added here??
             ),
         }
 
@@ -222,7 +198,7 @@ class OrthographicalProjection(BaseReprojection):
             plot_choices (list[str]): choices made for the plotting.
 
         Raises:
-            ValueError: if the plotting choice string is not recognised.
+            ValueError: if the plotting choice string is not recognized.
 
         Returns:
             dict[str, bool]: decides what will be plotted later on.
@@ -246,7 +222,7 @@ class OrthographicalProjection(BaseReprojection):
                 plot_choices_kwargs[key] = True
             else: 
                 raise ValueError(
-                    f"\033[1;31mPlot_choices argument '{key}' not recognised. "
+                    f"\033[1;31mPlot_choices argument '{key}' not recognized. "
                     f"Choices are ['{'\', \''.join(possibilities)}']\033[0m"   
                 ) 
         return plot_choices_kwargs
@@ -255,7 +231,7 @@ class OrthographicalProjection(BaseReprojection):
             self,
         ) -> tuple[
             EnvelopeInformation | None,
-            dict[str, list[str] | dict[str, int | float | tuple[int, ...]]],
+            dict[str, list[str] | dict[str, Any]],
         ]:
         """
         Contains the default choices made for the plotting options (e.g. the opacity, linestyle).
@@ -263,7 +239,7 @@ class OrthographicalProjection(BaseReprojection):
         Returns:
             tuple[
                 EnvelopeInformation | None,
-                dict[str, list[str] | dict[str, int | float | tuple[int, ...]]]
+                dict[str, list[str] | dict[str, Any]]
             ]: Dr. Auchere's envelope data and the default plotting information.
         """
 
@@ -275,9 +251,9 @@ class OrthographicalProjection(BaseReprojection):
             verbose=self.verbose,
         ) if self.plot_choices['envelope'] else None
 
-        # COLOURS plot
-        colour_generator = Plot.different_colours(omit=['white', 'red'])
-        colours = [  # todo change this if I also want different integration times
+        # COLORS plot
+        colour_generator = Plot.different_colors(omit=['white', 'red'])
+        colors = [  # todo change this if I also want different integration times
             next(colour_generator)
             for _ in self.polynomial_order
         ]
@@ -320,7 +296,7 @@ class OrthographicalProjection(BaseReprojection):
                 'alpha': 1,
                 'zorder': 3,
             },
-            'colours': colours,
+            'colors': colors,
         }
         return envelope_data, plot_kwargs
     
@@ -343,7 +319,7 @@ class OrthographicalProjection(BaseReprojection):
             processes: list[mp.Process] = cast(list[mp.Process], [None] * nb_processes)
             manager = mp.Manager()
             input_queue = manager.Queue()
-            output_queue: QueueAlias[tuple[int, ProjectionData]] = manager.Queue()
+            output_queue: QueueType[tuple[int, ProjectionData]] = manager.Queue()
             for i in range(data_len): input_queue.put(i)  # todo change this to a value proxy
             for _ in range(nb_processes): input_queue.put(None)
 
@@ -379,26 +355,26 @@ class OrthographicalProjection(BaseReprojection):
         self._warped_information = self.restructure_warped_information(warped_information_list)  
 
     @overload
-    def data_setup(self, inputs: int, output_queue: QueueAlias | None = ...) -> np.ndarray: ...
+    def data_setup(self, inputs: int, output_queue: QueueType | None = ...) -> np.ndarray: ...
 
     @overload
     def data_setup(
             self,
-            inputs: QueueAlias[int],
-            output_queue: QueueAlias | None = ...,
+            inputs: QueueType[int],
+            output_queue: QueueType | None = ...,
         ) -> None: ...
 
     @overload  #fallback
     def data_setup(
             self,
-            inputs: QueueAlias[int] | int,
-            output_queue: QueueAlias | None = ...,
+            inputs: QueueType[int] | int,
+            output_queue: QueueType | None = ...,
         ) -> np.ndarray | None: ...
 
     def data_setup(
             self,
-            inputs: QueueAlias[int] | int,
-            output_queue: QueueAlias[tuple[int, ProjectionData]] | None = None,
+            inputs: QueueType[int] | int,
+            output_queue: QueueType[tuple[int, ProjectionData]] | None = None,
         ) -> np.ndarray | None:
         """  # todo change docstring and the return type as it cannot be an ndarray any more
         Open the HDF5 file and does the processing and final plotting for each cube.
@@ -416,9 +392,7 @@ class OrthographicalProjection(BaseReprojection):
 
         # DATA open
         with h5py.File(self.filepath, 'r') as H5PYFile:
-            # PATH setup
-            init_path = 'Real/' if self.with_fake_data else ''
-
+            init_path = '' # todo take it away as I am not using fake data anymore
             # GLOBAL constants
             self.constants = self.get_global_constants(H5PYFile, init_path)
             data_pointers = CubesPointers()
@@ -597,7 +571,7 @@ class OrthographicalProjection(BaseReprojection):
                         self.format_cube(
                             data=integration,
                             constants=process_constants,
-                            colour=cast(list[str], self.plot_kwargs['colours'])[i],
+                            colour=cast(list[str], self.plot_kwargs['colors'])[i],
                             sdo_info=sdo_image_info,
                             warp=self.plot_choices['warp'],
                         )
@@ -751,9 +725,9 @@ class OrthographicalProjection(BaseReprojection):
                 )
 
                 for i, polynomial_order in enumerate(self.polynomial_order):
-                    reprojected_polynomial = ReprojectionProcessedPolynomial(
+                    reprojected_polynomial = ReProjectionProcessedPolynomial(
                         name=f"Fit ({polynomial_order}th) of " + data.name.lower(),
-                        colour=cast(list[str], self.plot_kwargs['colours'])[i],  # ! most likely the wrong choice of colours
+                        colour=cast(list[str], self.plot_kwargs['colors'])[i],  # ! most likely the wrong choice of colours
                         filepath=self.filepath,
                         group_path=data.group_path,
                         dx=self.constants.dx,
@@ -835,7 +809,7 @@ class OrthographicalProjection(BaseReprojection):
             if self.verbose > 1: print(f'\033[1;31m{e}\nTrying again...\033[0m', flush=self.flush)
             fail_count += 1
             time.sleep(0.5)
-            self.get_file_from_server(filepath=filepath, fail_count=fail_count)
+            return self.get_file_from_server(filepath=filepath, fail_count=fail_count)
         finally:
             return filepath
 
@@ -1055,7 +1029,7 @@ class OrthographicalProjection(BaseReprojection):
             polynomial_order (int): the order of the polynomial fit.
 
         Raises:
-            ValueError: if the cube type is not recognised.
+            ValueError: if the cube type is not recognized.
 
         Returns:
             FitPointer | UniqueFitPointer: the information about the polynomial fit data.
@@ -1112,7 +1086,7 @@ class OrthographicalProjection(BaseReprojection):
     
     def sdo_image_treatment(self, image: np.ndarray) -> np.ndarray:
         """ 
-        Pre-treatment for the sdo image for better visualisation of the regions of interest.
+        Pre-treatment for the sdo image for better visualization of the regions of interest.
 
         Args:
             image (np.ndarray): the SDO image to be treated.

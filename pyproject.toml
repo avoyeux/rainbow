@@ -93,6 +93,7 @@ dependencies = [
 
 [project.scripts]
 create = "rainbow.cli:create"
+project = "rainbow.cli:project"
 
 [build-system]
 requires = ["uv_build>=0.12.7,<0.13.0"]

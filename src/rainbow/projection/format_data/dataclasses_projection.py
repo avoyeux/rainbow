@@ -11,9 +11,9 @@ import h5py
 import numpy as np
 
 # IMPORTs local
-from src.projection.format_data.dataclasses_cubes import CubeInformation
-from src.projection.format_data.dataclasses_sdo_image import PolarImageInfo
-from src.projection.format_data.dataclasses_fit_n_envelopes import FitWithEnvelopes
+from .dataclasses_cubes import CubeInformation
+from .dataclasses_sdo_image import PolarImageInfo
+from .dataclasses_fit_n_envelopes import FitWithEnvelopes
 
 # TYPE ANNOTATIONs
 from typing import cast

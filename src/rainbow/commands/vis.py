@@ -766,7 +766,7 @@ class K3dAnimation(Setup):
         self.plot_los_sdo: list[VoxelAlias]
         self.plot_los_stereo: list[VoxelAlias]
         self.plot_fake_cube: list[VoxelAlias]
-        self.play_pause_button: ipywidgets.ToggleButton  # Play/Pause widget initialisation
+        self.play_pause_button: ipywidgets.ToggleButton  # Play/Pause widget initialization
         self.time_slider: ipywidgets.IntSlider # time slider widget
         self.date_dropdown: ipywidgets.Dropdown  # Date dropdown widget to show the date
         self.time_link: JsLinkAlias  # JavaScript Link between the two widgets

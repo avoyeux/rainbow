@@ -1,5 +1,5 @@
 """
-To store the code to create the initial reprojection plots.
+To store the code to create the initial re-projection plots.
 """
 from __future__ import annotations
 
@@ -10,21 +10,23 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 
-# IMPORTs personal
-from common import Decorators
-from src.projection.format_data import (
+# IMPORTs local
+from ..projection.format_data import (
     ProcessConstants, ProjectionData, ProjectedData, FitEnvelopes,
 )
-from src.projection.sdo_reprojection import OrthographicalProjection
-from src.projection.envelope_distance import EnvelopeDistanceAnnotation
+from ..projection.sdo_projection import OrthographicalProjection
+from ..projection.envelope_distance import EnvelopeDistanceAnnotation
 
 # TYPE ANNOTATIONs
 from typing import cast, Any
 from matplotlib.collections import PathCollection
 
+# API public
+__all__ = ['SDOProject']
 
 
-class Plotting(OrthographicalProjection):
+
+class SDOProject(OrthographicalProjection):
     """
     To plot the SDO's point of view image.
     """
@@ -34,13 +36,12 @@ class Plotting(OrthographicalProjection):
         To plot the SDO's point of view image.
         """
 
-        # PARENT CLASS initialisation
+        # PARENT CLASS initialization
         super().__init__(*args, **kwargs)
 
         # RUN code
         self.run()
 
-    @Decorators.running_time
     def plotting(
             self,
             process_constants: ProcessConstants,
@@ -206,7 +207,7 @@ class Plotting(OrthographicalProjection):
         plt.legend(loc='upper right')
 
         # PLOT save
-        plot_name = f"reprojection_{process_constants.date}.png"
+        plot_name = f"re_projection_{process_constants.date}.png"
         plt.savefig(os.path.join(self.paths['save'], plot_name), dpi=200)
         plt.close()
 
@@ -417,20 +418,3 @@ class Plotting(OrthographicalProjection):
                 fit_envelope=coords,
                 colour=colour,
             )
-
-
-
-if __name__ == '__main__':
-    Plotting(
-        integration_time=[],
-        polynomial_order=[4],
-        plot_choices=[
-            'no duplicates',
-            'full integration',
-            'fit',
-            'sdo image', 'envelope',
-            'warp',
-            'all sdo images',
-        ],
-        with_fake_data=False,
-    )

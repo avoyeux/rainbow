@@ -1,0 +1,17 @@
+# KEYWORD ARGUMENTs for the project command.
+polynomial_order:
+  - 4
+choices:
+  - 'no duplicates'
+  - 'full integration'
+  - 'fit'
+  - 'sdo image'
+  - 'envelope'
+  - 'warp'
+  - 'all sdo images'
+warp_integration_type: 'mean'
+
+# CONFIG
+processes: 10
+verbose: 1
+flush: false

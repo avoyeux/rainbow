@@ -15,9 +15,9 @@ import matplotlib.pyplot as plt
 from common import Decorators
 
 # IMPORTs local
-from config import config
-from src.projection.helpers.warp_sdo_image import WarpSdoImage, EnvelopeProcessing
-from src.projection.format_data import (
+from ...config import config
+from .warp_sdo_image import WarpSdoImage, EnvelopeProcessing
+from ..format_data import (
     ImageBorders, FitWithEnvelopes, EnvelopeInformation, WarpedInformation,
 )
 
@@ -115,7 +115,7 @@ class AllWarpedTreatment:
         self._warped_information = self._format_warped_information()
 
         # TEST plot
-        if config.run.test_plots: self.test_plot_angles(fit_angles=fit_n_envelopes.fit_angles)
+        # if config.run.test_plots: self.test_plot_angles(fit_angles=fit_n_envelopes.fit_angles)
 
     @property
     def warped_information(self) -> WarpedInformation: return self._warped_information
@@ -137,24 +137,24 @@ class AllWarpedTreatment:
 
         return envelopes is not None
 
-    def normalise_coords(
+    def normalize_coords(
             self,
             query_points: np.ndarray,
         ) -> tuple[np.ndarray, np.ndarray]:
         """  # todo update docstring
-        To normalise the fit coordinates so that they are between 0 and 1. This is done so that the
-        nearest neighbour search is not biased by the scale of the coordinates.
+        To normalize the fit coordinates so that they are between 0 and 1. This is done so that the
+        nearest neighbor search is not biased by the scale of the coordinates.
 
         Args:
             query_points (np.ndarray): the coordinates of the middle curve for which we want to
                 find the closest fit coordinates (to get the corresponding angles).
 
         Returns:
-            tuple[np.ndarray, np.ndarray]: the normalised coordinates of the fit and the middle
+            tuple[np.ndarray, np.ndarray]: the normalized coordinates of the fit and the middle
                 curve.
         """
 
-        # NORMALISE fit
+        # NORMALIZE fit
         min_vals = np.min(self.processed_fit, axis=0, keepdims=True)
         max_vals = np.max(self.processed_fit, axis=0, keepdims=True)
         fit_coords = (self.processed_fit - min_vals) / (max_vals - min_vals)
@@ -174,8 +174,8 @@ class AllWarpedTreatment:
             np.ndarray: the closest angles to the middle curve.
         """
 
-        # COORDs 'normalisation'
-        fit_coords, query_points = self.normalise_coords(
+        # COORDs 'normalization'
+        fit_coords, query_points = self.normalize_coords(
             query_points=np.stack([
                 self.processed_middle.polar_r, self.processed_middle.polar_theta
             ], axis=1),

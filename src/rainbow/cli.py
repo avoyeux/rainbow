@@ -16,14 +16,14 @@ from common import Decorators
 
 # IMPORTs local
 from .config import config
-from .commands import DataSaver, K3dAnimation
+from .commands import DataSaver, K3dAnimation, SDOProject
 
 # TYPE ANNOTATIONs
 from typing import Any, TYPE_CHECKING
 if TYPE_CHECKING: from argparse import Namespace
 
 # API public
-__all__ = ['create', 'vis']
+__all__ = ['create', 'vis', 'project']
 
 
 
@@ -91,6 +91,18 @@ def create() -> None:
     # RUN
     DataSaver(**params)
 
+@Decorators.running_time
+def project() -> None:
+    # todo add docstring
+
+    print('\033[1;0mProjecting SDO data...\033[0m', flush=True)
+    parser = argparse.ArgumentParser(description='Project SDO data.')
+
+    # KWARGs
+    params = default_args(parser, config.file.project)
+
+    # RUN
+    SDOProject(**params)
 
 @Decorators.running_time
 def vis() -> None:

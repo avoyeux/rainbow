@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 # IMPORTs local
-from src.projection.format_data.dataclasses_warp import WarpedInformation
+from .dataclasses_warp import WarpedInformation
 
 # TYPE ANNOTATIONs
 from typing import cast

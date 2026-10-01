@@ -17,18 +17,18 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # IMPORTs local
-from config import config
-from src.projection.format_data import FitWithEnvelopes, FitEnvelopes, EnvelopeInformation
-from src.projection.helpers.extract_envelope import CreateFitEnvelope
-from src.projection.helpers.base_reprojection import BaseReprojection
-from src.data.polynomial_fit.base_fit_processing import BaseFitProcessing
-from src.data.polynomial_fit.polynomial_bordered import ProcessedBorderedPolynomialFit
+from ...config import config
+from ...projection.format_data import FitWithEnvelopes, FitEnvelopes, EnvelopeInformation
+from ...projection.helpers.extract_envelope import CreateFitEnvelope
+from ...projection.helpers.base_reprojection import BaseReProjection
+from .base_fit_processing import BaseFitProcessing
+from .polynomial_bordered import ProcessedBorderedPolynomialFit
 
 # TYPE ANNOTATIONs
 from typing import cast, Protocol
 
 # API public
-__all__ = ['ReprojectionProcessedPolynomial']
+__all__ = ['ReProjectionProcessedPolynomial']
 
 
 
@@ -39,7 +39,7 @@ class PolynomialCallable(Protocol):
     of arguments and, as such, cannot be strictly defined with typing.Callable.
     """
 
-    def __call__(self, t: np.ndarray, *coeffs: int | float) -> np.ndarray: ...
+    def __call__(self, t: np.ndarray, *coef: int | float) -> np.ndarray: ...
 
 
 @dataclass(slots=True, repr=False, eq=False)
@@ -56,11 +56,11 @@ class ProcessedFit(BaseFitProcessing):
         # COORDs re-ordered (for the cumulative distance)
         self.reorder_data()
 
-        # COORDs normalised
-        self.normalise_coords()
+        # COORDs normalized
+        self.normalize_coords()
 
         # DISTANCE cumulative
-        self.cumulative_distance_normalised()
+        self.cumulative_distance_normalized()
 
         # COORDs uniform
         self.uniform_coords()
@@ -123,11 +123,11 @@ class ProcessedEnvelope(BaseFitProcessing):
         # COORDs re-ordered (for the cumulative distance)
         self.reorder_data()
 
-        # COORDs normalised
-        self.normalise_coords()
+        # COORDs normalized
+        self.normalize_coords()
 
         # DISTANCE cumulative
-        self.cumulative_distance_normalised()
+        self.cumulative_distance_normalized()
 
         # FIT parameters
         self.scipy_curve_fit()
@@ -233,14 +233,14 @@ class ProcessedEnvelope(BaseFitProcessing):
                 function.
         """
 
-        def nth_order_polynomial(t: np.ndarray, *coeffs: int | float) -> np.ndarray:
+        def nth_order_polynomial(t: np.ndarray, *coef: int | float) -> np.ndarray:
             """
             Polynomial function given a 1D ndarray and the polynomial coefficients. The polynomial
             order is defined before hand.
 
             Args:
                 t (np.ndarray): the 1D array for which you want the polynomial results.
-                coeffs (int | float): the coefficient(s) for the polynomial in the order a_0 + 
+                coef (int | float): the coefficient(s) for the polynomial in the order a_0 + 
                     a_1 * t + a_2 * t**2 + ...
 
             Returns:
@@ -251,7 +251,7 @@ class ProcessedEnvelope(BaseFitProcessing):
             result: np.ndarray = cast(np.ndarray, 0)
 
             # POLYNOMIAL
-            for i in range(self.polynomial_order + 1): result += coeffs[i] * t ** i
+            for i in range(self.polynomial_order + 1): result += coef[i] * t ** i
             return result
         return nth_order_polynomial
 
@@ -346,7 +346,7 @@ class Fitting2D:
         return envelope 
 
 
-class ReprojectionProcessedPolynomial(ProcessedBorderedPolynomialFit, BaseReprojection):
+class ReProjectionProcessedPolynomial(ProcessedBorderedPolynomialFit, BaseReProjection):
     """
     To get the processed polynomial 3D fit results and create the corresponding 2D envelopes.
     The processed polynomial fit was made so that the extremities stop at the Sun surface (when 
@@ -369,11 +369,12 @@ class ReprojectionProcessedPolynomial(ProcessedBorderedPolynomialFit, BaseReproj
             feet_threshold: float,
             envelope_radius: int | float = 3e4,
             create_envelope: bool = True,
-            verbose: bool | None = None,
-            flush: bool | None = None,
-            test_plots: bool | None = None,
+            verbose: int = 0,
+            flush: bool = False,
+            test_plots: bool = False,
         ) -> None:
         """
+        todo update docstring
         To initialise the class.
         The reprocessed_fit_n_envelopes method should be called to get the results.
 
@@ -401,9 +402,9 @@ class ReprojectionProcessedPolynomial(ProcessedBorderedPolynomialFit, BaseReproj
         """
 
         # CONFIGURATION attributes
-        self.flush: bool = config.run.flush if flush is None else flush
-        self.verbose: bool = config.run.verbose if verbose is None else verbose
-        self.plots: bool = config.run.test_plots if test_plots is None else test_plots
+        self.flush = flush
+        self.verbose = verbose
+        self.plots = test_plots
 
         # PARENTs
         super().__init__(
@@ -413,7 +414,7 @@ class ReprojectionProcessedPolynomial(ProcessedBorderedPolynomialFit, BaseReproj
             number_of_points=250,
             dx=dx,
         )
-        BaseReprojection.__init__(self)
+        BaseReProjection.__init__(self)
 
         # ATTRIBUTEs
         self.paths = self.paths_setup()
@@ -434,12 +435,7 @@ class ReprojectionProcessedPolynomial(ProcessedBorderedPolynomialFit, BaseReproj
         Returns:
             dict[str, str]: the formatted paths.
         """
-
-        # PATHs formatting
-        paths = {
-            'save': config.path.dir.data.temp,
-        }
-        return paths
+        return {'save': config.dir.temporary}
 
     def reprocessed_fit_n_envelopes(self, index: int, sdo_pos: np.ndarray) -> FitWithEnvelopes:
         """
@@ -588,7 +584,7 @@ class ReprojectionProcessedPolynomial(ProcessedBorderedPolynomialFit, BaseReproj
             new_envelope: list[FitEnvelopes],
         ) -> None:
         """
-        To visualise the results of the fitting (only used during the results).
+        To visualize the results of the fitting (only used during the results).
 
         Args:
             date (str): the date of the cube.

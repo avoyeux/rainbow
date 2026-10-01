@@ -1,5 +1,5 @@
 """
-To store the parent class containing the reprojection methods.
+To store the parent class containing the re-projection methods.
 """
 from __future__ import annotations
 
@@ -7,19 +7,22 @@ from __future__ import annotations
 import numpy as np
 
 # IMPORTs local
-from src.projection.format_data import CubeInformation
+from ..format_data import CubeInformation
+
+# API public
+__all__ = ['BaseReProjection']
 
 
 
-class BaseReprojection:
+class BaseReProjection:
     """
-    To store the base methods used for the reprojection of data cubes from cartesian coordinates
+    To store the base methods used for the re-projection of data cubes from cartesian coordinates
     to polar coordinates in the SDO image reference frame.
     """
 
     def __init__(self) -> None:
         """
-        To initialise the class containing the reprojection methods.
+        To initialise the class containing the re-projection methods.
         The initialization is empty as the class is only used as a parent class.
         """
 
@@ -54,7 +57,7 @@ class BaseReprojection:
 
         Returns:
             tuple[np.ndarray, float]: the voxel coordinates in the new reference frame, with the
-                normalisation constant of the Z-axis (later needed to calculate the projected polar
+                normalization constant of the Z-axis (later needed to calculate the projected polar
                 radius from the disk center to each voxel).
         """
 
@@ -63,7 +66,7 @@ class BaseReprojection:
         a, b, c = - sdo_pos.astype('float64')
         sign = a / abs(a)
 
-        # CONSTANTs normalisation
+        # CONSTANTs normalization
         new_N_x = 1 / np.sqrt(1 + b**2 / a**2 + ((a**2 + b**2) / (a * c))**2)
         new_N_y = a * c / np.sqrt(a**2 + b**2)
         new_N_z = 1 /  np.sqrt(a**2 + b**2 + c**2)
@@ -72,11 +75,11 @@ class BaseReprojection:
         new_x = 1 / new_N_x + sign * new_N_x * (x + y * b / a - z * (a**2 + b**2) / (a * c))
         new_y = 1 / new_N_y + sign * new_N_y * (-x * b / (a * c) + y / c)
         new_z = 1 / new_N_z + sign * new_N_z * (x * a + y * b + z * c)
-        
+
         # DATA return
         coords = np.stack([new_x, new_y, new_z], axis=0)
         return coords, new_N_z
-    
+
     def get_polar_image(self, data: tuple[np.ndarray, float]) -> np.ndarray:
         """ 
         Gives the polar coordinates in SDO's image reference frame of the protuberance voxels.
@@ -89,7 +92,7 @@ class BaseReprojection:
             np.ndarray: (r, theta) of the voxels in polar coordinates centred on the disk center as
                 seen from SDO and with theta starting from the projected solar north pole.
         """
-        
+
         # DATA open
         coords, z_norm = data
         x, y, z = coords
@@ -102,7 +105,7 @@ class BaseReprojection:
         # UNITs to km
         rho_polar = np.tan(rho_polar) / z_norm  # ? why did I put this here ?
         return np.stack([rho_polar, theta_polar], axis=0)
-    
+
     def get_angles(self, coords: np.ndarray) -> np.ndarray:
         """ 
         Gives the angle between the polynomial fit and the SDO image plane. 
@@ -115,7 +118,7 @@ class BaseReprojection:
             np.ndarray: the angles between the coordinates (for b_{n+1} - b_{n}) and SDO's image
                 plane. Information needed to correct the velocities seen in 2D in SDO's image.
         """
-        
+
         x, y, z = coords
 
         # DIRECTIONS a_n = b_{n+1} - b{n}
@@ -129,7 +132,7 @@ class BaseReprojection:
         )
         theta_spherical -= np.pi / 2
         return theta_spherical
-    
+
     def get_polar_image_angles(self, data: tuple[np.ndarray, float]) -> np.ndarray:
         """ 
         Gives the polar coordinates (r, theta) in the created SDO image (i.e. centred on the disk

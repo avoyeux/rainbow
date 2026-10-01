@@ -18,12 +18,15 @@ import matplotlib.pyplot as plt
 from astropy import units as u
 
 # IMPORTs local
-from config import config
-from src.projection.format_data import ImageBorders, PolarImageInfo, ImageInfo
+from ...config import config
+from ..format_data import ImageBorders, PolarImageInfo, ImageInfo
 
 # TYPE ANNOTATIONs
 from typing import Any
 type AstropyFitsHeaderType = Any
+
+# API public
+__all__ = ['CartesianToPolar']
 
 
 
@@ -112,7 +115,7 @@ class CartesianToPolar:
 
     def _initial_checks(self) -> None:
         """
-        To check the direction string attribute to make sure it is recognised.
+        To check the direction string attribute to make sure it is recognized.
 
         Raises:
             ValueError: if the direction string attribute is wrong.
@@ -135,9 +138,9 @@ class CartesianToPolar:
         """
 
         # PATHs formatting
-        paths = {'sdo': config.path.dir.data.sdo}
+        paths = {'sdo': config.dir.input.sdo.fits}
         return paths
-    
+
     def _open_data(self) -> ImageInfo:
         """
         To open the FITS file, get and compute the necessary info for the image processing.
@@ -145,7 +148,7 @@ class CartesianToPolar:
         Returns:
             ImageInfo: the needed information for the image processing.
         """
-        
+
         # OPEN fits
         index = 0 if 'AIA' in self.filepath else 1
         hdul = astropy.io.fits.open(self.filepath)
@@ -160,11 +163,11 @@ class CartesianToPolar:
             sun_center=(header['Y0_MP'], header['X0_MP']),
             resolution_km=((
                 (np.tan(np.deg2rad(header['CDELT1'] / 3600) / 2) * header['DSUN_OBS']) * 2
-            ) / 1e3), # in km       
+            ) / 1e3), # in km
         )
         hdul.close()
         return data_info
-    
+
     def carrington_to_cartesian(self, header: AstropyFitsHeaderType) -> np.ndarray:
         """
         To convert the Carrington coordinates to the Cartesian one.
@@ -228,7 +231,7 @@ class CartesianToPolar:
         theta_nb_pixels = round(360 / self.image_info.resolution_angle)
         radial_nb_pixels = round(self.image_info.max_index)
 
-        # RE-CALCULATION dx and dtheta (round() was used).
+        # RE-CALCULATION dx and d-theta (round() was used).
         new_d_theta = 360 / theta_nb_pixels  
         new_dx = max(self.borders.radial_distance) * 1e3 / radial_nb_pixels
 
@@ -256,7 +259,7 @@ class CartesianToPolar:
             colour=self.colour,
         )
         return polar_image_info
-    
+
     def _rotate_polar(self, polar_image: np.ndarray, d_theta: float) -> np.ndarray:
         """
         To rotate the image so that the theta angle angle starts where you want it to (given the
@@ -269,7 +272,7 @@ class CartesianToPolar:
         Returns:
             np.ndarray: the corresponding rotated polar image.
         """
-        
+
         shift = round(self.theta_offset / d_theta)
         return np.roll(polar_image, shift=-shift, axis=0)
 

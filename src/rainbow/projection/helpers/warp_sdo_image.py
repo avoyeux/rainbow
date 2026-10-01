@@ -12,11 +12,14 @@ import scipy
 import numpy as np
 
 # IMPORTs local
-from src.projection.format_data import ImageBorders, FitEnvelopes
-from src.data.polynomial_fit.base_fit_processing import BaseFitProcessing
+from ..format_data import ImageBorders, FitEnvelopes
+from ...data.polynomial_fit.base_fit_processing import BaseFitProcessing
 
 # TYPE ANNOTATIONs
 from typing import cast
+
+# API public
+__all__ = ['EnvelopeProcessing', 'WarpSdoImage']
 
 
 
@@ -36,11 +39,11 @@ class EnvelopeProcessing(BaseFitProcessing):
         # COORDs re-ordered (for the cumulative distance)
         self.reorder_data()
 
-        # COORDs normalised
-        self.normalise_coords()
+        # COORDs normalized
+        self.normalize_coords()
 
         # DISTANCE cumulative
-        self.cumulative_distance_normalised()
+        self.cumulative_distance_normalized()
 
         # COORDs uniform
         self.uniform_coords()
@@ -60,7 +63,7 @@ class EnvelopeProcessing(BaseFitProcessing):
 
         # COORDs update
         self.polar_theta, self.polar_r = sorted_coords
-    
+
     def uniform_coords(self) -> None:
         """
         To uniformly space the coordinates on the curve.
@@ -90,7 +93,7 @@ class EnvelopeProcessing(BaseFitProcessing):
             tuple[np.ndarray, np.ndarray]: the polar coordinates of the envelope for the given
                 cumulative distance.
         """
-    
+
         polar_r_coords = self.polar_r_interp(cumulative_distance)
         polar_theta_coords = self.polar_theta_interp(cumulative_distance)
         return polar_r_coords, polar_theta_coords
@@ -112,7 +115,7 @@ class WarpSdoImage:
         ) -> None:
         """
         To warp the SDO image in between the given two envelopes.
-        After initialisation, the warped SDO image is saved in the .warped_image attribute. 
+        After initialization, the warped SDO image is saved in the .warped_image attribute. 
 
         Args:
             sdo_image (np.ndarray): the SDO image to warp.

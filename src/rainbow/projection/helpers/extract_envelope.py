@@ -16,8 +16,11 @@ from PIL import Image
 from typing import cast
 
 # IMPORTs local
-from config import config
-from src.projection.format_data import ImageBorders, FitEnvelopes, EnvelopeInformation
+from ...config import config
+from ...projection.format_data import ImageBorders, FitEnvelopes, EnvelopeInformation
+
+# API public
+__all__ = ['ExtractEnvelope']
 
 
 
@@ -32,9 +35,10 @@ class ExtractEnvelope:
             polynomial_order: int,
             number_of_points: int,
             borders: ImageBorders,
-            verbose: int | None = None,
+            verbose: int  = 0,
         ) -> None:
         """
+        todo update docstring
         To get the curve equations of the two PNGs (created by Dr. Auchere) of the envelope
         encompassing the Rainbow protuberance. From there, it also creates the middle path of that
         envelope. 
@@ -53,7 +57,7 @@ class ExtractEnvelope:
         """
 
         # CONFIG attributes
-        self.verbose: int = config.run.verbose if verbose is None else verbose
+        self.verbose = verbose
 
         # ATTRIBUTEs setup
         self.polynomial_order = polynomial_order
@@ -75,9 +79,10 @@ class ExtractEnvelope:
             polynomial_order: int,
             number_of_points: int,
             borders: ImageBorders,
-            verbose: int | None = None,
+            verbose: int  = 0,
         ) -> EnvelopeInformation:
         """
+        todo update docstring
         This classmethod directly gives the envelope and middle path positions in polar
         coordinates.
 
@@ -88,8 +93,7 @@ class ExtractEnvelope:
                 envelope and the middle path.
             borders (ImageBorders): the radial distance and polar angle to borders consider for the
                 image.
-            verbose (int | None, optional): decides on the details in the prints. When None, it
-                takes the value from the config file. Defaults to None.
+            verbose (int, optional): decides on the details in the prints. Defaults to 0.
 
         Returns:
             EnvelopeInformation: the envelope information in polar coordinates.
@@ -102,7 +106,7 @@ class ExtractEnvelope:
             verbose=verbose,
         )
         return instance.envelope_information
-    
+
     def path_setup(self) -> dict[str, str]:
         """
         To get the paths to the needed directories and files.
@@ -112,9 +116,9 @@ class ExtractEnvelope:
         """
 
         # PATHs save
-        paths = {'envelope': config.path.dir.data.result.envelope}
+        paths = {'envelope': config.dir.input.envelope}
         return paths
-    
+
     def main(self) -> None:
         """
         To get the envelope and corresponding middle path information.
@@ -122,10 +126,10 @@ class ExtractEnvelope:
 
         # ENVELOPE processing
         lower_envelope = self.envelope_processing(
-            filepath=os.path.join(self.paths['envelope'], 'rainbow_lower_path_v2.png'),
+            filepath=os.path.join(self.paths['envelope'], 'lower.png'),
         )
         upper_envelope = self.envelope_processing(
-            filepath=os.path.join(self.paths['envelope'], 'rainbow_upper_path_v2.png'),
+            filepath=os.path.join(self.paths['envelope'], 'upper.png'),
         )
 
         # CURVE middle
