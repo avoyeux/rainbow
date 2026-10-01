@@ -29,14 +29,13 @@ from rainbow.animation.animation_dataclasses import (
     PolynomialData, UniquePolynomialData,
 )
 
-
 # TYPE ANNOTATIONs
 from typing import Any, overload, Literal, cast
 type VoxelAlias = Any
 type JsLinkAlias = Any
 
 # API public
-__all__ = ['Setup', 'K3dAnimation']
+__all__ = ['K3dAnimation']
 
 # todo need to improve the names of the different datasets in the visualization
 # todo need to be able to add the extended version of the polynomial fit
@@ -53,31 +52,26 @@ class Setup:
     @typeguard.typechecked
     def __init__(
             self,
-            filepath: str | None = None,
+            filepath: str = config.file.data,
             choices: list[str] = ['sdo pov', 'sun', 'no duplicate', 'fit'],
             time_interval: int = 24,
             polynomial_order: list[int] = [4],
-            with_fake_data: bool = False,
-            processes: int | None = None,
-            verbose: int | None = None,
-            flush: int | None = None,
-    ) -> None:
+            verbose: int = 0,
+            flush: bool = False,
+        ) -> None:
         """
-        To setup the necessary data for the visualisation.
+        todo update docstring
+        To setup the necessary data for the visualization.
 
         Args:
             filepath (str | None, optional): the filepath to the HDF5 file. If None, it will use
                 the config file. Defaults to None.
-            choices (list[str], optional): the choices for the visualisation.
+            choices (list[str], optional): the choices for the visualization.
                 Defaults to ['sdo pov', 'sun', 'no duplicate', 'fit'].
             time_interval (int, optional): time interval use for the data integration (in hours).
                 Defaults to 24.
             polynomial_order (list[int], optional): the polynomial order(s) used for the fitting.
                 Defaults to [4].
-            with_fake_data (bool, optional): using a file that contains the real and the fact data.
-                Used to find the dataset paths. Defaults to False.
-            processes (int | None, optional): the number of processes used for the multiprocessing.
-                If None, it will use the config file. Defaults to None.
             verbose (int | None, optional): the verbosity level for the prints. If None, it will
                 use the config file. Defaults to None.
             flush (int | None, optional): deciding to flush the buffer each time there is a print.
@@ -85,39 +79,32 @@ class Setup:
         """
 
         # CONSTANTs
-        self.solar_r = 6.96e5
+        self._solar_r = 6.96e5
 
         # CONFIGURATION attributes
-        if filepath is None and with_fake_data:
-            self.filepath: str = config.path.data.fusion
-        elif filepath is None:
-            self.filepath: str = config.path.data.real
-        else:
-            self.filepath = filepath
-        self.processes = config.run.processes if processes is None else processes
-        self.verbose = config.run.verbose if verbose is None else verbose
-        self.flush = config.run.flush if flush is None else flush
+        self._filepath = filepath
+        self._verbose = verbose
+        self._flush = flush
 
         # ATTRIBUTEs other
-        self.time_interval = time_interval
-        self.polynomial_order = polynomial_order
-        self.with_fake_data = with_fake_data
+        self._time_interval = time_interval
+        self._polynomial_order = polynomial_order
 
         # ATTRIBUTES new
-        self.choices = self._choices(choices)
-        self.plot_polynomial_colours = [
+        self._choices = self._get_choices(choices)
+        self._plot_polynomial_colors = [
             next(Plot.random_hexadecimal_int_color_generator())
-            for _ in self.polynomial_order
+            for _ in self._polynomial_order
         ]
-        self.feet = ' with feet' if self.choices['with feet'] else ''
-        
+        self._feet = ' with feet' if self._choices['with feet'] else ''
+
         # PLACEHOLDERs
-        self.radius_index: float
+        self._radius_index: float
 
         # RUN
-        self.cubes: CubesData = self.get_data()
+        self._cubes: CubesData = self._get_data()
 
-    def _choices(self, plot_choices: list[str]) -> dict[str, bool]:
+    def _get_choices(self, plot_choices: list[str]) -> dict[str, bool]:
         """
         Checks and formats the choices given by the user.
 
@@ -158,23 +145,22 @@ class Setup:
         return choices_kwargs
 
     @Decorators.running_time
-    def get_data(self) -> CubesData:
+    def _get_data(self) -> CubesData:
         """
         Opens the HDF5 file to get the necessary data for visualization.
         """
 
         # DATA init
-        HDF5File = h5py.File(self.filepath, 'r')
+        HDF5File = h5py.File(self._filepath, 'r')
         cubes = CubesData(hdf5File=HDF5File)
-        init_path = '' if not self.with_fake_data else 'Real/'
 
         # DATA main
-        self.constants = self.get_default_data(HDF5File, init_path)
-        self.radius_index = self.solar_r / self.constants.dx
+        self.constants = self.get_default_data(HDF5File, '')
+        self._radius_index = self._solar_r / self.constants.dx
 
         # CHOICES data
-        if self.choices['all data']: 
-            path = init_path + 'Filtered/All data' + self.feet
+        if self._choices['all data']: 
+            path = 'Filtered/All data' + self._feet
             cubes.all_data = self.get_cube_info(
                 HDF5File=HDF5File,
                 group_path=path,
@@ -183,8 +169,8 @@ class Setup:
                 interpolate=False,
             )
 
-        if self.choices['no duplicate']: 
-            path = init_path + 'Filtered/No duplicates' + self.feet
+        if self._choices['no duplicate']: 
+            path = 'Filtered/No duplicates' + self._feet
             cubes.no_duplicate = self.get_cube_info(
                 HDF5File=HDF5File,
                 group_path=path,
@@ -193,10 +179,10 @@ class Setup:
                 interpolate=False,
             )
 
-        if self.choices['all data integration']: 
+        if self._choices['all data integration']: 
             path = (
-                init_path + 'Time integrated/All data' + self.feet +
-                f'/Time integration of {self.time_interval} hours'
+                'Time integrated/All data' + self._feet +
+                f'/Time integration of {self._time_interval} hours'
             )
             cubes.integration_all_data = self.get_cube_info(
                 HDF5File=HDF5File,
@@ -204,10 +190,10 @@ class Setup:
                 colour='red',
                 opacity=0.4,
             )
-        
-        if self.choices['all data full integration']:
+
+        if self._choices['all data full integration']:
             path = (
-                init_path + 'Time integrated/All data' + self.feet +
+                'Time integrated/All data' + self._feet +
                 '/Full integration'
             )
             cubes.full_integration_all_data = self.get_cube_info(
@@ -218,10 +204,10 @@ class Setup:
                 cube_type='unique',
             )
 
-        if self.choices['no duplicate integration']:
+        if self._choices['no duplicate integration']:
             path = (
-                init_path + 'Time integrated/No duplicates' + self.feet +
-                f'/Time integration of {self.time_interval} hours'
+                'Time integrated/No duplicates' + self._feet +
+                f'/Time integration of {self._time_interval} hours'
             )
             cubes.integration_no_duplicate = self.get_cube_info(
                 HDF5File=HDF5File,
@@ -230,9 +216,9 @@ class Setup:
                 opacity=0.2,
             )
 
-        if self.choices['no duplicate full integration']:
+        if self._choices['no duplicate full integration']:
             path = (
-                init_path + 'Time integrated/No duplicates' + self.feet +
+                'Time integrated/No duplicates' + self._feet +
                 '/Full integration'
             )
             cubes.full_integration_no_duplicate = self.get_cube_info(
@@ -243,8 +229,8 @@ class Setup:
                 cube_type='unique',
             )
 
-        if self.choices['line of sight sdo']:
-            path = init_path + 'Filtered/SDO line of sight'
+        if self._choices['line of sight sdo']:
+            path = 'Filtered/SDO line of sight'
             cubes.los_sdo = self.get_cube_info(
                 HDF5File=HDF5File,
                 group_path=path,
@@ -253,8 +239,8 @@ class Setup:
                 interpolate=False,
             )
 
-        if self.choices['line of sight stereo']:
-            path = init_path + 'Filtered/STEREO line of sight'
+        if self._choices['line of sight stereo']:
+            path = 'Filtered/STEREO line of sight'
             cubes.los_stereo = self.get_cube_info(
                 HDF5File=HDF5File,
                 group_path=path,
@@ -264,7 +250,7 @@ class Setup:
             )
 
         # POVs sdo, stereo
-        if self.choices['pov sdo']:
+        if self._choices['pov sdo']:
             # SDO positions
             sdo_positions: np.ndarray = cast(h5py.Dataset, HDF5File['SDO positions'])[...]
 
@@ -273,7 +259,7 @@ class Setup:
                 np.ndarray[tuple[int], np.dtype[np.float32]],
                 (sdo_positions[self.constants.time_indexes] / self.constants.dx).astype('float32'),
             )
-        if self.choices['pov stereo']:
+        if self._choices['pov stereo']:
             # STEREO positions
             stereo_positions: np.ndarray = cast(h5py.Dataset, HDF5File['STEREO B positions'])[...]
 
@@ -286,7 +272,7 @@ class Setup:
             )
             # todo will need to add the POV center
 
-        if self.choices['fake data']:
+        if self._choices['fake data']:
             cubes.fake_cube = self.get_cube_info(
                 HDF5File=HDF5File,
                 group_path='Fake/Filtered/All data',
@@ -296,7 +282,7 @@ class Setup:
                 cube_type='fake',
             )
 
-        if self.choices['test cube']:
+        if self._choices['test cube']:
             cubes.test_cube = self.get_cube_info(
                 HDF5File=HDF5File,
                 group_path='Test data/Sun surface',
@@ -316,10 +302,7 @@ class Setup:
         """
 
         # FOV get
-        hdul = fits.open(os.path.join(
-            config.path.dir.data.sdo,
-            'AIA_fullhead_000.fits.gz',
-        ))
+        hdul = fits.open(os.path.join(config.dir.input.sdo, 'AIA_fullhead_000.fits.gz'))
         image_shape = hdul[0].data.shape
         fov_degrees = image_shape[0] * hdul[0].header['CDELT1'] / 3600
         hdul.close()
@@ -327,6 +310,7 @@ class Setup:
     
     def get_default_data(self, HDF5File: h5py.File, init_path: str) -> CubesConstants:
         """
+        todo change this code as fake data not used anymore (i.e. no need for init_path)
         Gives the global information for the data.
 
         Args:
@@ -337,14 +321,14 @@ class Setup:
         Returns:
             CubesConstants: the global information of protuberance.
         """
-        
+
         # DATEs
         dates_bytes: np.ndarray[tuple[int], np.dtype[np.bytes_]] = cast(
             h5py.Dataset,
             HDF5File['Dates'],
         )[...]
 
-        if self.choices['all dates']:
+        if self._choices['all dates']:
             # TIME INDEXEs all
             time_indexes: np.ndarray[tuple[int], np.dtype[np.int_]] = np.arange(
                 0,
@@ -518,7 +502,7 @@ class Setup:
             )
         print(f'FETCHED -- {cube_info.name} data.')
         return cube_info
-    
+
     @overload
     def get_polynomial_data(
             self,
@@ -598,14 +582,14 @@ class Setup:
 
         # ! need to change this so that I can also decide to visualize the extended polynomial fit
 
-        if self.choices['fit'] and interpolate:  # todo add 'or self.choices['extended fit']'
+        if self._choices['fit'] and interpolate:  # todo add 'or self.choices['extended fit']'
             # POLYNOMIALs setup
             polynomials: list[PolynomialData | UniquePolynomialData] = cast(
                 list[PolynomialData | UniquePolynomialData],
-                [None] * len(self.polynomial_order)
+                [None] * len(self._polynomial_order)
             )  # the union shouldn't be inside but no choice as the IDE will complain
 
-            for i, order in enumerate(self.polynomial_order):
+            for i, order in enumerate(self._polynomial_order):
                 # DATA get
                 dataset_path = group_path + f'/{order}th order polynomial'
                 interpolation_coords = cast(h5py.Dataset, HDF5File[dataset_path + '/coords'])
@@ -616,7 +600,7 @@ class Setup:
                         dataset=interpolation_coords,
                         order=order,
                         name=self.name_data(dataset_path),
-                        color_hex=self.plot_polynomial_colours[i],
+                        color_hex=self._plot_polynomial_colors[i],
                     )
                 else:
                     # DATA formatting
@@ -624,7 +608,7 @@ class Setup:
                         dataset=interpolation_coords,
                         order=order,
                         name=self.name_data(dataset_path),
-                        color_hex=self.plot_polynomial_colours[i],
+                        color_hex=self._plot_polynomial_colors[i],
                     )
                 print(f'FETCHED -- {polynomials[i].name}.')
             return cast(list[PolynomialData] | list[UniquePolynomialData], polynomials)
@@ -687,7 +671,7 @@ class Setup:
                         f"\033[1;31m The group path '{group_path}' pattern not recognised. \033[0m"
                     )
         return name
-    
+
     def color_str_to_hex(self, colour: str) -> int:
         """
         Converts a colour string to hexadecimal int value.
@@ -698,15 +682,13 @@ class Setup:
         Returns:
             int: the corresponding hexadecimal int value.
         """
-
         return int(mcolors.to_hex(mcolors.CSS4_COLORS[colour])[1:], 16)
 
     def close(self) -> None:
         """
         To close the HDF5 file.
         """
-
-        self.cubes.close()
+        self._cubes.close()
 
 
 class K3dAnimation(Setup):
@@ -730,7 +712,7 @@ class K3dAnimation(Setup):
             **kwargs,
         ) -> None:
         """
-        To visualise the data in k3d. The fetching and naming of the data is done in the parent
+        To visualize the data in k3d. The fetching and naming of the data is done in the parent
         class.
 
         Args:
@@ -765,7 +747,7 @@ class K3dAnimation(Setup):
         self.sleep_time = sleep_time  # sets the time between each frames (in seconds)
         self.camera_zoom_speed = camera_zoom_speed  # zoom speed of the camera 
         self.camera_pos = camera_pos  # position of the camera multiplied by 1au
-        self.camera_fov = self.get_sdo_fov() if self.choices['pov sdo'] else camera_fov  # in deg
+        self.camera_fov = self.get_sdo_fov() if self._choices['pov sdo'] else camera_fov  # in deg
         self.up_vector = up_vector  # up vector for the camera
         self.visible_grid = visible_grid  # setting the grid to be visible or not
         self.texture_resolution = texture_resolution
@@ -773,7 +755,7 @@ class K3dAnimation(Setup):
         self.outlines = outlines
 
         # PLACEHOLDERs
-        self.plot: k3d.plot.Plot  # plot object  #type:ignore
+        self.plot: k3d.plot.Plot  # plot object
         self.plot_alldata: list[VoxelAlias] # voxels plot of the all data 
         self.plot_dupli_new: list[VoxelAlias]  # same for the second method
         self.plot_full_alldata: list[VoxelAlias]  # voxels plot for the full integration
@@ -797,11 +779,11 @@ class K3dAnimation(Setup):
         """
 
         # * also used [0x0000ff] as color_map
-        
+
         # DISPLAY setup
-        self.plot = k3d.plot(grid_visible=self.visible_grid)  # black: background_color=0x000000
+        self.plot = k3d.plot(grid_visible=self.visible_grid)  # black: background_color=0x000000 #type:ignore
         self.plot.height = self.plot_height  
-            
+
         # CAMERA params
         self.camera_params()
 
@@ -812,7 +794,7 @@ class K3dAnimation(Setup):
         }
 
         # SUN add
-        if self.choices['sun']:
+        if self._choices['sun']:
             self.add_sun()
             points = k3d.points(
                 positions=self.sun_points,
@@ -824,7 +806,7 @@ class K3dAnimation(Setup):
             )
             self.plot += points
 
-        if self.choices['test points']:
+        if self._choices['test points']:
             cube = self.find_first_cube()
             if cube is not None:
                 point = k3d.points(
@@ -853,72 +835,72 @@ class K3dAnimation(Setup):
                 self.plot += point2
 
         # TEST CUBE add
-        if self.cubes.test_cube is not None:
+        if self._cubes.test_cube is not None:
             # VOXELs create
-            self.plot_test_cube = self.create_voxels(self.cubes.test_cube, **kwargs)
+            self.plot_test_cube = self.create_voxels(self._cubes.test_cube, **kwargs)
             for plot in self.plot_test_cube: self.plot += plot
 
         # ALL DATA add
-        if self.cubes.all_data is not None:
+        if self._cubes.all_data is not None:
             # VOXELS create
-            self.plot_alldata = self.create_voxels(self.cubes.all_data, **kwargs)
+            self.plot_alldata = self.create_voxels(self._cubes.all_data, **kwargs)
             for plot in self.plot_alldata: self.plot += plot     
-        
+
         # NO DUPLICATES add
-        if self.cubes.no_duplicate is not None:
+        if self._cubes.no_duplicate is not None:
             # VOXELs create
-            self.plot_dupli_new = self.create_voxels(self.cubes.no_duplicate, **kwargs)
+            self.plot_dupli_new = self.create_voxels(self._cubes.no_duplicate, **kwargs)
             for plot in self.plot_dupli_new: self.plot += plot
 
         # TIME INTEGRATION add
-        if self.cubes.integration_all_data is not None:
+        if self._cubes.integration_all_data is not None:
             # VOXELs create
-            self.plot_interv_new = self.create_voxels(self.cubes.integration_all_data, **kwargs)
+            self.plot_interv_new = self.create_voxels(self._cubes.integration_all_data, **kwargs)
             for plot in self.plot_interv_new: self.plot += plot
-    
+
         # TIME NO DUPLICATES add       
-        if self.cubes.integration_no_duplicate is not None:
+        if self._cubes.integration_no_duplicate is not None:
             # VOXELs create
             self.plot_interv_dupli_new = self.create_voxels(
-                self.cubes.integration_no_duplicate,
+                self._cubes.integration_no_duplicate,
                 **kwargs,
             )
             for plot in self.plot_interv_dupli_new: self.plot += plot  
-        
+
         # FULL INTEGRATION add
-        if self.cubes.full_integration_all_data is not None:
+        if self._cubes.full_integration_all_data is not None:
             # VOXELs create
             self.plot_full_alldata = self.create_voxels(
-                self.cubes.full_integration_all_data,
+                self._cubes.full_integration_all_data,
                 **kwargs,
             )
             for plot in self.plot_full_alldata: self.plot += plot
 
         # FULL NO DUPLICATES add
-        if self.cubes.full_integration_no_duplicate is not None:
+        if self._cubes.full_integration_no_duplicate is not None:
             # VOXELs create
             self.plot_full_no_duplicate = self.create_voxels(
-                self.cubes.full_integration_no_duplicate,
+                self._cubes.full_integration_no_duplicate,
                 **kwargs,
             )
             for plot in self.plot_full_no_duplicate: self.plot += plot
 
         # SDO LINE OF SIGHT add
-        if self.cubes.los_sdo is not None:
+        if self._cubes.los_sdo is not None:
             # VOXELs create
-            self.plot_los_sdo = self.create_voxels(self.cubes.los_sdo, **kwargs)
+            self.plot_los_sdo = self.create_voxels(self._cubes.los_sdo, **kwargs)
             for plot in self.plot_los_sdo: self.plot += plot
 
         # STEREO LINE OF SIGHT add
-        if self.cubes.los_stereo is not None:
+        if self._cubes.los_stereo is not None:
             # VOXELs create
-            self.plot_los_stereo = self.create_voxels(self.cubes.los_stereo, **kwargs)
+            self.plot_los_stereo = self.create_voxels(self._cubes.los_stereo, **kwargs)
             for plot in self.plot_los_stereo: self.plot += plot
         
         # CUBE fake
-        if self.cubes.fake_cube is not None:
+        if self._cubes.fake_cube is not None:
             # VOXELs create
-            self.plot_fake_cube = self.create_voxels(self.cubes.fake_cube, **kwargs)
+            self.plot_fake_cube = self.create_voxels(self._cubes.fake_cube, **kwargs)
             for plot in self.plot_fake_cube: self.plot += plot
 
         # BUTTON play/pause
@@ -961,14 +943,14 @@ class K3dAnimation(Setup):
         ) -> list[VoxelAlias]:
         """
         Creates the initial k3d voxels and the corresponding polynomial fit voxels for the
-        visualisation.  
+        visualization.  
 
         Args:
-            cube (CubeInfo | FakeCubeInfo | UniqueCubeInfo): the cube information to visualise.
-            index (int, optional): the index of the time value to visualise. Defaults to 0.
+            cube (CubeInfo | FakeCubeInfo | UniqueCubeInfo): the cube information to visualize.
+            index (int, optional): the index of the time value to visualize. Defaults to 0.
 
         Returns:
-            list[VoxelAlias]: the corresponding voxels for the k3d visualisation.
+            list[VoxelAlias]: the corresponding voxels for the k3d visualization.
         """
 
         # PLACEHOLDER voxels
@@ -987,7 +969,7 @@ class K3dAnimation(Setup):
             translation=translation,
             **kwargs,
         )
-        
+
         if cube.polynomials is not None:
             # INTERPOLATIONs setup
             polynomials = cube.polynomials
@@ -1025,7 +1007,7 @@ class K3dAnimation(Setup):
         else:
             reference = np.array([0, 0, 0], dtype='float32')
         return reference
-    
+
     def find_first_cube(self) -> CubeInfo | None:
         """
         Finds the first cube that has data in it.
@@ -1033,18 +1015,18 @@ class K3dAnimation(Setup):
         Returns:
             CubeInfo | None: the first cube that has data in it. None if no data found.
         """
-        
+
         # FIND cube
-        for attr_name in self.cubes.__slots__:
+        for attr_name in self._cubes.__slots__:
             if attr_name in ['hdf5File', 'sdo_pos', 'stereo_pos']: continue
-            if getattr(self.cubes, attr_name) is not None: return getattr(self.cubes, attr_name)
+            if getattr(self._cubes, attr_name) is not None: return getattr(self._cubes, attr_name)
 
         # NO DATA
         return None
 
     def camera_params(self) -> None:
         """
-        Camera visualisation parameters.
+        Camera visualization parameters.
         """
         
         # PARAMs constant
@@ -1053,36 +1035,36 @@ class K3dAnimation(Setup):
         self.plot.camera_zoom_speed = self.camera_zoom_speed  # zooming too quickly (default=1.2)
 
         self._camera_reference = self.get_camera_reference()
-        
+
         # POV stereo
-        if self.cubes.stereo_pos is not None:
+        if self._cubes.stereo_pos is not None:
             self.plot.camera = [
-                self.cubes.stereo_pos[0, 0],
-                self.cubes.stereo_pos[0, 1],
-                self.cubes.stereo_pos[0, 2],
+                self._cubes.stereo_pos[0, 0],
+                self._cubes.stereo_pos[0, 1],
+                self._cubes.stereo_pos[0, 2],
                 self._camera_reference[0],
                 self._camera_reference[1],
                 self._camera_reference[2],
                 self.up_vector[0],
                 self.up_vector[1],
                 self.up_vector[2],
-            ] 
+            ]
         # POV sdo
-        elif self.cubes.sdo_pos is not None:
+        elif self._cubes.sdo_pos is not None:
             self.plot.camera = [
-                self.cubes.sdo_pos[0, 0],
-                self.cubes.sdo_pos[0, 1],
-                self.cubes.sdo_pos[0, 2],
+                self._cubes.sdo_pos[0, 0],
+                self._cubes.sdo_pos[0, 1],
+                self._cubes.sdo_pos[0, 2],
                 self._camera_reference[0],
                 self._camera_reference[1],
                 self._camera_reference[2],
                 self.up_vector[0],
                 self.up_vector[1],
                 self.up_vector[2]
-            ]  
+            ]
         else:
             au_in_solar_r = 215  # 1 au in solar radii
-            distance_to_sun = au_in_solar_r * self.radius_index 
+            distance_to_sun = au_in_solar_r * self._radius_index 
 
             if not self.camera_pos:
                 print("No 'camera_pos', setting default values.")
@@ -1102,7 +1084,7 @@ class K3dAnimation(Setup):
 
     def add_sun(self) -> None:
         """
-        Add the Sun in the visualisation.
+        Add the Sun in the visualization.
         The Sun is just made up of small spheres positioned at the Sun's surface.
         """
         # todo re-add the choice where I can decide to add a texture.
@@ -1114,9 +1096,9 @@ class K3dAnimation(Setup):
         phi, theta = np.meshgrid(phi, theta)  # the subsequent meshgrid
 
         # COORDs cartesian
-        x = self.radius_index * np.sin(phi) * np.cos(theta)
-        y = self.radius_index * np.sin(phi) * np.sin(theta)
-        z = self.radius_index * np.cos(phi)
+        x = self._radius_index * np.sin(phi) * np.cos(theta)
+        y = self._radius_index * np.sin(phi) * np.sin(theta)
+        z = self._radius_index * np.cos(phi)
 
         # SAVE coords
         self.sun_points = np.array([x.ravel(), y.ravel(), z.ravel()], dtype='float32').T
@@ -1131,11 +1113,11 @@ class K3dAnimation(Setup):
         """
 
         # POV stereo
-        if self.cubes.stereo_pos is not None:
+        if self._cubes.stereo_pos is not None:
             self.plot.camera = [
-                self.cubes.stereo_pos[change['new'], 0],
-                self.cubes.stereo_pos[change['new'], 1],
-                self.cubes.stereo_pos[change['new'], 2],
+                self._cubes.stereo_pos[change['new'], 0],
+                self._cubes.stereo_pos[change['new'], 1],
+                self._cubes.stereo_pos[change['new'], 2],
                 self._camera_reference[0],
                 self._camera_reference[1],
                 self._camera_reference[2],
@@ -1146,11 +1128,11 @@ class K3dAnimation(Setup):
             time.sleep(0.2) 
 
         # POV sdo
-        elif self.cubes.sdo_pos is not None:
+        elif self._cubes.sdo_pos is not None:
             self.plot.camera = [
-                self.cubes.sdo_pos[change['new'], 0],
-                self.cubes.sdo_pos[change['new'], 1],
-                self.cubes.sdo_pos[change['new'], 2],
+                self._cubes.sdo_pos[change['new'], 0],
+                self._cubes.sdo_pos[change['new'], 1],
+                self._cubes.sdo_pos[change['new'], 2],
                 self._camera_reference[0],
                 self._camera_reference[1],
                 self._camera_reference[2],
@@ -1159,30 +1141,30 @@ class K3dAnimation(Setup):
                 self.up_vector[2],
             ]
             time.sleep(0.2)
-        
+
         # ALL DATA
-        if self.cubes.all_data is not None:
-            self.update_voxel(self.plot_alldata, self.cubes.all_data, change['new'])
+        if self._cubes.all_data is not None:
+            self.update_voxel(self.plot_alldata, self._cubes.all_data, change['new'])
         # NO DUPLICATES
-        if self.cubes.no_duplicate is not None:
-            self.update_voxel(self.plot_dupli_new,self.cubes.no_duplicate,change['new'])
+        if self._cubes.no_duplicate is not None:
+            self.update_voxel(self.plot_dupli_new,self._cubes.no_duplicate,change['new'])
         # TIME INTEGRATION
-        if self.cubes.integration_all_data is not None:
-            self.update_voxel(self.plot_interv_new, self.cubes.integration_all_data, change['new'])
+        if self._cubes.integration_all_data is not None:
+            self.update_voxel(self.plot_interv_new, self._cubes.integration_all_data, change['new'])
         # TIME NO DUPLICATES
-        if self.cubes.integration_no_duplicate is not None:     
+        if self._cubes.integration_no_duplicate is not None:     
             self.update_voxel(
-                self.plot_interv_dupli_new, self.cubes.integration_no_duplicate, change['new'],
+                self.plot_interv_dupli_new, self._cubes.integration_no_duplicate, change['new'],
             )        
         # SDO LINE OF SIGHT
-        if self.cubes.los_sdo is not None:
-            self.update_voxel(self.plot_los_sdo, self.cubes.los_sdo, change['new'])
+        if self._cubes.los_sdo is not None:
+            self.update_voxel(self.plot_los_sdo, self._cubes.los_sdo, change['new'])
         # STEREO LINE OF SIGHT
-        if self.cubes.los_stereo is not None:
-            self.update_voxel(self.plot_los_stereo, self.cubes.los_stereo, change['new'])
+        if self._cubes.los_stereo is not None:
+            self.update_voxel(self.plot_los_stereo, self._cubes.los_stereo, change['new'])
         # FAKE CUBE
-        if self.cubes.fake_cube is not None:
-            self.update_voxel(self.plot_fake_cube, self.cubes.fake_cube, change['new'])
+        if self._cubes.fake_cube is not None:
+            self.update_voxel(self.plot_fake_cube, self._cubes.fake_cube, change['new'])
 
     def update_voxel(
             self,
@@ -1205,7 +1187,7 @@ class K3dAnimation(Setup):
         else:
             # DATA cube and polynomials
             cubes = cube_info[index]
-        
+
         # PLOTs add data
         for i, plot in enumerate(plots): plot.voxels = cubes[i].transpose((2, 1, 0))
 
@@ -1213,12 +1195,12 @@ class K3dAnimation(Setup):
         """
         Params for the play button.
         """
-        
+
         if self.play_pause_button.value and self.time_slider.value < len(self.constants.dates) - 1:
             self.time_slider.value += 1
             threading.Timer(self.sleep_time, self.play).start()
             # where you also set the sleep() time.
-                
+
         else:
             self.play_pause_button.description = 'Play'
             self.play_pause_button.icon = 'play'
