@@ -34,8 +34,8 @@ dir:
 
             avg: !join [*_stereo, 'avg']
             int: !join [*_stereo, 'int']
-            masque: !join [*_stereo, 'masque']
-            masque_karine: !join [*_stereo, 'masque_karine']
+            mask: !join [*_stereo, 'mask']
+            mask_karine: !join [*_stereo, 'mask_karine']
 
     output:
         _path: &_output !join [*_dir, 'output']
