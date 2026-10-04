@@ -9,7 +9,9 @@ if TYPE_CHECKING:
     # IMPORTs standard
     import queue
     import multiprocessing.shared_memory
+    import multiprocessing.sharedctypes
 
     # TYPEs
+    type CounterType[T] = multiprocessing.sharedctypes.Synchronized[T]
     type QueueType[T] = queue.Queue[T]
     type SharedMemoryType = multiprocessing.shared_memory.SharedMemory
