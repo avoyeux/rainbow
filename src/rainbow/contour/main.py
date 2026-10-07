@@ -7,11 +7,14 @@ from __future__ import annotations
 import os
 
 # IMPORTs local
-from .structure import Stereo, Sdo
+from .plot import Plot
+from .structure import Data, Stereo, Sdo
 
 # API public
 __all__ = ['Create']
 
+
+import numpy as np
 
 
 class Create:
@@ -19,6 +22,10 @@ class Create:
 
     def __init__(self, index: int, verbose: int = 0, flush: bool = False) -> None:
         # todo add docstring
+
+        # CONFIG
+        self._verbose = verbose
+        self._flush = flush
 
         self._index = index
 
@@ -41,132 +48,23 @@ class Create:
                 f"The string {os.path.basename(Stereo.int_paths[self._index])} has the wrong format."
             )
 
-        # matching SDO fits by header timestamp against the stereo timestamp
-        sdo_mask = self._match_sdo(os.path.basename(stereo_int))
-        sdo_image = self._match_sdo_image(os.path.basename(stereo_int))
-
-        self._plot_figure(
-            stereo_int=stereo_int,
-            stereo_avg=self._stereo_avg[loop],
-            sdo_image=sdo_image,
-            sdo_mask=sdo_mask,
-            number=number,
+        # PATHs
+        stereo_171 = Data(
+            data='', # ! placeholder
+            mask=None,
         )
-
-    def _build_sdo_mask_map(self) -> dict[str, str]:
-        """
-        To read the DATE-OBS header of each SDO mask FITS file and build a timestamp->filepath
-        map so that matching is an O(1) lookup instead of reopening every file per stereo frame.
-
-        Returns:
-            dict[str, str]: mapping of 'YYYY-MM-DDTHH:MM:SS' (19 chars) to the SDO mask filepath.
-        """
-
-        mask_map: dict[str, str] = {}
-        for sdo_path in self._sdo_fits:
-            header = fits.getheader(sdo_path, 0)
-            date_obs = header['DATE-OBS']
-            mask_map[date_obs[:19]] = sdo_path
-        return mask_map
-
-    def _read_sdo_timestamps(self) -> dict[str, str]:
-        """
-        To read the SDO_timestamps.txt file and build a timestamp->server/local FITS path map
-        (i.e. path + '/S00000/image_lev1.fits'). This only reads the file; no file is fetched.
-
-        Returns:
-            dict[str, str]: mapping of 'YYYY-MM-DDTHH:MM:SS' (19 chars) to the SDO image path.
-        """
-
-        # TIMESTAMPs file
-        with open(config.file.timestamps, 'r') as files:
-            strings = files.read().splitlines()
-
-        filepath_end = '/S00000/image_lev1.fits'
-        timestamp_map: dict[str, str] = {}
-        for line in strings:
-            path, timestamp = line.split(" ; ")
-            timestamp_map[timestamp[:-3]] = path + filepath_end
-        return timestamp_map
-
-    def _get_sdo_image_file(self, timestamp: str) -> str | None:
-        """
-        To get the local filepath of the real SDO image for a given timestamp, mirroring it from
-        the server only if it is not available locally. Results are cached so each file is fetched
-        at most once.
-
-        Args:
-            timestamp (str): the observation timestamp ('YYYY-MM-DDTHH:MM:SS', 19 chars).
-
-        Returns:
-            str | None: the local SDO image filepath, None if no file exists for this timestamp.
-        """
-
-        if timestamp in self._sdo_image_cache:
-            return self._sdo_image_cache[timestamp]
-
-        remote_path = self._sdo_timestamp_paths.get(timestamp)
-        if remote_path is None:
-            return None
-
-        if os.path.exists(remote_path):
-            local_path = remote_path
-        else:
-            server = SSHMirroredFilesystem(verbose=self._verbose)
-            try:
-                local_path = server.mirror(remote_path, strip_level=1)
-            finally:
-                server.close()
-
-        self._sdo_image_cache[timestamp] = local_path
-        return local_path
-
-    @staticmethod
-    def _stereo_timestamp(stereo_name: str) -> str:
-        """
-        To extract the observation timestamp from a STEREO filename
-        (eg. '0000_2012-07-24T12-00-00.000.png' -> '2012-07-24T12:00:00').
-        """
-
-        timestamp_str = os.path.splitext(stereo_name)[0].split('_', 1)[1]
-        date_part, time_part = timestamp_str.split('T')
-        time_part = time_part.split('.')[0].replace('-', ':')
-        return f'{date_part}T{time_part}'
-
-    def _match_sdo(self, stereo_name: str) -> str | None:
-        """
-        To find the SDO mask FITS file whose observation time matches the stereo image.
-
-        Args:
-            stereo_name (str): the basename of the STEREO image.
-
-        Returns:
-            str | None: the filepath to the matching SDO mask FITS, None if none found.
-        """
-
-        timestamp = self._stereo_timestamp(stereo_name)
-        return self._sdo_by_timestamp.get(timestamp[:19])
-
-    def _match_sdo_image(self, stereo_name: str) -> str | None:
-        """
-        To find the real SDO image FITS file whose timestamp matches the stereo image, fetching
-        it lazily. The image is only fetched when a corresponding SDO mask exists.
-
-        Args:
-            stereo_name (str): the basename of the STEREO image.
-
-        Returns:
-            str | None: the filepath to the matching SDO image FITS, None if no mask exists or
-                no file is found.
-        """
-
-        timestamp = self._stereo_timestamp(stereo_name)[:19]
-
-        # Only fetch an image when the corresponding SDO mask exists
-        if timestamp not in self._sdo_by_timestamp:
-            return None
-
-        return self._get_sdo_image_file(timestamp)
+        stereo_304 = Data(
+            data=Stereo.int_paths[self._index],
+            mask=Stereo.mask_path(number),
+        )
+        sdo_171 = Data(
+            data='', # ! placeholder
+            mask=None,
+        )
+        sdo_304 = Data(
+            data='', #! placeholder
+            mask=Sdo.mask_path(number),
+        )
 
     def _plot_figure(
             self,
@@ -435,7 +333,7 @@ class Create:
         dx = self._d_lon if axis == 1 else self._d_lat
 
         # image border
-        border = cen - width / 2
+        border = cen - width / 2  # ? asb() ?
 
         # first valid grid position
         first_pos = border

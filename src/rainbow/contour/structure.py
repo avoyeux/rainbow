@@ -12,8 +12,22 @@ from glob import glob
 from ..config import config
 
 # API public
-__all__ = ['Stereo', 'Sdo']
+__all__ = ['Data', 'Stereo', 'Sdo']
 
+class Data:
+    # todo add docstring
+    # todo add the method to get the numpy array corresponding to the images.
+    __slots__ = ('data', 'mask')
+
+    def __init__(
+            self,
+            data: str,
+            mask: str | None,
+        ) -> None:
+        # todo add docstring
+
+        self.data = data
+        self.mask = mask
 
 
 class Stereo:
@@ -84,19 +98,19 @@ class Stereo:
         return stamp
 
     @staticmethod
-    def mask_path(index: int) -> str | None:
+    def mask_path(number: int) -> str | None:
         """
         The fullpath to the mask corresponding to the given image index.
 
         Arguments:
-            index -- int.
-                Index of the image.
+            number -- int.
+                Number of the image.
 
         Returns:
             str | None: Fullpath to the mask if it exists, None otherwise.
         """
 
-        filepath = os.path.join(Stereo.mask_dir, f'frame{index:04d}.png')
+        filepath = os.path.join(Stereo.mask_dir, f'frame{number:04d}.png')
         if not os.path.isfile(filepath): return
         return filepath
 
@@ -106,5 +120,22 @@ class Sdo:
     Utilities to find and process the SDO images.
     """
 
-    fits: list[str] = sorted(glob(os.path.join(config.dir.input.sdo.fits, '*.fits.gz')))
-    png: list[str] = sorted(glob(os.path.join(config.dir.input.sdo.png, '*.png')))
+    _mask_dir: str = config.dir.input.sdo.mask
+
+    @staticmethod
+    def mask_path(number: int) -> str | None:
+        """
+        The fullpath to the mask corresponding to the given image index.
+
+        Arguments:
+            number -- int.
+                Number of the image.
+
+        Returns:
+            str | None: Fullpath to the mask if it exists, None otherwise.
+        """
+
+        filepath = os.path.join(Sdo._mask_dir, f'AIA_fullhead_{number:03d}.png')
+        if not os.path.isfile(filepath): return
+        return filepath
+

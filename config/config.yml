@@ -26,7 +26,7 @@ dir:
         sdo:  # todo check if png path needed here or in 'output'
             _path: &_sdo !join [*_input, 'sdo']
 
-            fits: *_sdo
+            mask: *_sdo
             png: !join [*_sdo, 'png']
 
         stereo:

@@ -63,14 +63,9 @@ class Contours:
         self._d_lat = d_lat
         self._deg_grid_width = deg_grid_width
 
-        # # SDO mask DATE-OBS -> filepath map (masks are local, cheap to index by header)
-        # self._sdo_by_timestamp = self._build_sdo_mask_map()
+        # RUN
+        self.run()
 
-        # # SDO real image lookup: lazy, one file is mirrored only when needed for a plot
-        # self._sdo_timestamp_paths = self._read_sdo_timestamps()
-        # self._sdo_image_cache: dict[str, str] = {}
-
-    @Decorators.running_time
     def run(self) -> None:
         """
         To loop over all the STEREO images and create the corresponding figure.
@@ -110,8 +105,3 @@ class Contours:
 
             # RUN
             Create(index)
-
-
-if __name__ == '__main__':
-    contours = Contours()
-    contours.run()
