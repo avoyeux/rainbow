@@ -12,9 +12,6 @@ from __future__ import annotations
 # IMPORTs standard
 import multiprocessing as mp
 
-# IMPORTs personal
-from common import Decorators
-
 # IMPORTs local
 from ..contour import Create, Stereo
 
@@ -26,12 +23,11 @@ __all__ = ['Contours']
 
 
 
-class Contours:
+class Contour:
     """
     To plot the STEREO and SDO images with their corresponding mask contours.
     """
 
-    @Decorators.running_time
     def __init__(
             self,
             lon_cen: float = 195,
@@ -82,16 +78,21 @@ class Contours:
             # MULTIPROCESSING run
             processes: list[mp.Process] = [None] * nb_processes  #type:ignore
             for i in range(nb_processes):
-                p = mp.Process(target=self.multiprocessing, args=(index,))
+                p = mp.Process(
+                    target=self.multiprocessing,
+                    args=(index, self._verbose, self._flush),
+                )
                 p.start()
                 processes[i] = p
+                if self._verbose > 3: print(f"Process {i:02d} started", flush=self._flush)
             for p in processes: p.join()
 
         # NO MULTIPROCESSING
         else:
-            for i in range(len(filepaths)): Create(i)
+            for i in range(len(filepaths)): Create(i, self._verbose - 1, self._flush)
 
-    def multiprocessing(self, counter: CounterType[int]) -> None:
+    @staticmethod
+    def multiprocessing(counter: CounterType[int], verbose: int, flush: bool) -> None:
         """
         Loops over all the STEREO images and create the corresponding figure.
         """
@@ -104,4 +105,4 @@ class Contours:
                 if index < 0: break
 
             # RUN
-            Create(index)
+            Create(index, verbose - 1, flush)

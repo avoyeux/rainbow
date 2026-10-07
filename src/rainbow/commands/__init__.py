@@ -6,3 +6,4 @@ If uv is not installed, you can use these files as the direct executables to run
 from .create import DataSaver
 from .vis import K3dAnimation
 from .project import SDOProject
+from .contour import Contour

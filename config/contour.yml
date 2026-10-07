@@ -1,8 +1,6 @@
 # KEYWORD ARGUMENTs for the 'contours' command.
 
-
-
 # CONFIG
 processes: 1
-verbose: 0
+verbose: 5
 flush: false

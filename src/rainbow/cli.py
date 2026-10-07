@@ -16,14 +16,14 @@ from common import Decorators
 
 # IMPORTs local
 from .config import config
-from .commands import DataSaver, K3dAnimation, SDOProject
+from .commands import DataSaver, K3dAnimation, SDOProject, Contour
 
 # TYPE ANNOTATIONs
 from typing import Any, TYPE_CHECKING
 if TYPE_CHECKING: from argparse import Namespace
 
 # API public
-__all__ = ['create', 'vis', 'project']
+__all__ = ['create', 'vis', 'project', 'contour']
 
 
 
@@ -74,7 +74,6 @@ def default_args(
     params.pop('yaml', None)
     return params
 
-
 @Decorators.running_time
 def create() -> None:
     """
@@ -116,3 +115,18 @@ def vis() -> None:
 
     # RUN
     K3dAnimation(**params)
+
+@Decorators.running_time
+def contour() -> None:
+    """
+    Creates the 3*3 contour plot.
+    """
+
+    print('\033[1;0mCreating the 3*3 contours plot...\033[0m', flush=True)
+    parser = argparse.ArgumentParser(description='Create the 3*3 contours plot.')
+
+    # KWARGs
+    params = default_args(parser, config.file.contour)
+
+    # RUN
+    Contour(**params)

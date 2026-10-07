@@ -74,3 +74,4 @@ file:
     create: !join [*_config, 'create.yml']
     vis: !join [*_config, 'vis.yml']
     project: !join [*_config, 'project.yml']
+    contour: !join [*_config, 'contour.yml']

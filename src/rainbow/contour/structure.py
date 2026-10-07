@@ -17,16 +17,18 @@ __all__ = ['Data', 'Stereo', 'Sdo']
 class Data:
     # todo add docstring
     # todo add the method to get the numpy array corresponding to the images.
-    __slots__ = ('data', 'mask')
+    __slots__ = ('raw', 'avg', 'mask')
 
     def __init__(
             self,
-            data: str,
+            raw: str,
+            avg: str,
             mask: str | None,
         ) -> None:
         # todo add docstring
 
-        self.data = data
+        self.raw = raw
+        self.avg = avg
         self.mask = mask
 
 
@@ -138,4 +140,3 @@ class Sdo:
         filepath = os.path.join(Sdo._mask_dir, f'AIA_fullhead_{number:03d}.png')
         if not os.path.isfile(filepath): return
         return filepath
-
