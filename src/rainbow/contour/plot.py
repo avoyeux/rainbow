@@ -7,6 +7,7 @@ from __future__ import annotations
 import os
 
 # IMPORTs third-party
+from astropy.io import fits
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -108,6 +109,14 @@ class Plot:
             mask=None,
             add_grid_label=False,
         )
+        self._add_sdo_304_plot(  #! placeholder
+            fig,
+            grid,
+            plot_pos=(1, 2), 
+            data=self._sdo_304.raw,
+            mask=None,
+            add_grid_label=False,
+        )
         # todo add sdo values.
 
         # DOWN
@@ -135,6 +144,14 @@ class Plot:
             ),
             add_grid_label=False,
         )
+        self._add_sdo_304_plot(  #! placeholder
+            fig,
+            grid,
+            plot_pos=(1, 2), 
+            data=self._sdo_304.raw,
+            mask=None,
+            add_grid_label=False,
+        )
 
         # SAVE
         filepath = os.path.join(
@@ -148,6 +165,31 @@ class Plot:
             dpi=self._dpi,
         )
         plt.close()
+
+    def _add_sdo_304_plot(
+            self,
+            fig: plt.Figure,
+            grid: plt.GridSpec,
+            plot_pos: tuple[int, int],
+            data: str,
+            mask: npt.NDArray[np.bool_] | None,
+            add_grid_label: bool = False,
+        ) -> None:
+        # todo add docstring
+
+        # ADD
+        ax = fig.add_subplot(grid[plot_pos])
+        ax.axis('off')
+
+        # IMAGE
+        hdul = fits.open(data)
+        ax.imshow(hdul[0].data)
+
+        # # CONTOUR
+        # if mask is not None: self._add_contour(ax, mask)
+
+        # # GRID
+        # self._add_grid_stereo(ax, add_grid_label)
 
     def _add_stereo_304_plot(  # ! could be also for 171 if same image lon lat
             self,

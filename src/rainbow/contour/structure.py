@@ -10,9 +10,14 @@ from glob import glob
 
 # IMPORTs local
 from ..config import config
+from .sdo_fits import sdo_image_finder
 
 # API public
 __all__ = ['Data', 'Stereo', 'Sdo']
+
+# todo add the opening of the images directly here
+
+
 
 class Data:
     # todo add docstring
@@ -71,7 +76,8 @@ class Stereo:
                 Index of the image.
 
         Returns:
-            int | None: Number in the filename if it exists, None otherwise.
+            int | None
+                Number in the filename if it exists, None otherwise.
         """
 
         match = Stereo.pattern.match(os.path.basename(Stereo.int_paths[index]))
@@ -79,20 +85,25 @@ class Stereo:
         return int(match.group('number'))
 
     @staticmethod
-    def timestamp(index: int) -> str | None:
+    def timestamp(number: int) -> str:
         """
         Gives the timestamp in the filename given the corresponding image index.
 
         Arguments:
-            index -- int.
-                Index of the image.
+            number -- int.
+                Number of the image.
+
+        Raises:
+            ValueError: If the number is not found in the stereo images.
 
         Returns:
-            str | None: Timestamp in the filename if it exists, None otherwise.
+            str
+                Timestamp in the filename if it exists, None otherwise.
         """
 
-        match = Stereo.pattern.match(os.path.basename(Stereo.int_paths[index]))
-        if match is None: return
+        match = Stereo.pattern.match(os.path.basename(Stereo.int_paths[number]))
+        if match is None:
+            raise ValueError(f"Number {number} not found in the stereo images.")
         stamp = (
             f"{match.group('year')}-{match.group('month')}-{match.group('day')}T"
             f"{match.group('hour')}:{match.group('minute')}:{match.group('second')}"
@@ -109,7 +120,8 @@ class Stereo:
                 Number of the image.
 
         Returns:
-            str | None: Fullpath to the mask if it exists, None otherwise.
+            str | None
+                Fullpath to the mask if it exists, None otherwise.
         """
 
         filepath = os.path.join(Stereo.mask_dir, f'frame{number:04d}.png')
@@ -123,6 +135,7 @@ class Sdo:
     """
 
     _mask_dir: str = config.dir.input.sdo.mask
+    _timestamp_to_path: dict[str, str] = sdo_image_finder()
 
     @staticmethod
     def mask_path(number: int) -> str | None:
@@ -134,9 +147,32 @@ class Sdo:
                 Number of the image.
 
         Returns:
-            str | None: Fullpath to the mask if it exists, None otherwise.
+            str | None
+                Fullpath to the mask if it exists, None otherwise.
         """
 
-        filepath = os.path.join(Sdo._mask_dir, f'AIA_fullhead_{number:03d}.png')
+        filepath = os.path.join(Sdo._mask_dir, f'AIA_fullhead_{number:03d}.fits.gz')
         if not os.path.isfile(filepath): return
+        return filepath
+
+    @staticmethod
+    def fits_path(timestamp: str) -> str:
+        """
+        The fullpath to the SDO image corresponding to the given timestamp.
+
+        Arguments:
+            timestamp -- str.
+                Timestamp of the image with the format 'YYYY-MM-DDTHH:MM:SS'.
+
+        Raises:
+            ValueError: If the timestamp is not found in the SDO image finder.
+
+        Returns:
+            str
+                Fullpath to the SDO image.
+        """
+
+        filepath = Sdo._timestamp_to_path.get(timestamp, None)
+        if filepath is None:
+            raise ValueError(f"Timestamp {timestamp} not found in the SDO image finder.")
         return filepath

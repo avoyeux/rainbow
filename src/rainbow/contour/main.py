@@ -42,6 +42,8 @@ class Create:
                 f"The string {os.path.basename(Stereo.int_paths[self._index])} has the wrong format."
             )
 
+        timestamp = Stereo.timestamp(number)
+
         # PATHs
         stereo_171 = Data(
             raw='', # ! placeholder
@@ -59,7 +61,7 @@ class Create:
             mask=None,
         )
         sdo_304 = Data(
-            raw='', #! placeholder
+            raw=Sdo.fits_path(timestamp),
             avg='', # ! placeholder
             mask=Sdo.mask_path(number),
         )
