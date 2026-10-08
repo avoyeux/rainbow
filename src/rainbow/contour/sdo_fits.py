@@ -21,7 +21,7 @@ def sdo_image_finder() -> dict[str, str]:
     Returns:
         dict[str, str]
             Dictionary with the keys representing the timestamps and the values the corresponding
-            SDO FITS filepath. Timestamps are in the format 'YYYY-MM-DDTHH:MM:SS'.
+            SDO FITS filepath. Timestamps are in the format 'YYYY-MM-DDTHH:MM'.
     """
 
     # Setup
@@ -33,6 +33,14 @@ def sdo_image_finder() -> dict[str, str]:
     timestamp_to_path = {}
     for s in tuple_list:
         path, timestamp = s
-        print(timestamp[:-3])
-        timestamp_to_path[timestamp[:-3]] = path + filepath_end
+
+        # EXCEPTIONs
+        without_seconds = timestamp[:-6]
+        if without_seconds == '2012-07-24T20:07':
+            without_seconds = '2012-07-24T20:06'
+        elif without_seconds == '2012-07-24T20:20':
+            without_seconds = '2012-07-24T20:16'
+
+        # POPULATE
+        timestamp_to_path[without_seconds] = path + filepath_end
     return timestamp_to_path

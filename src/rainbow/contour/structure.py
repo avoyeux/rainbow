@@ -8,9 +8,19 @@ import os
 import re
 from glob import glob
 
+# IMPORTs third-party
+import numpy as np
+import matplotlib.pyplot as plt
+from astropy.io import fits
+
 # IMPORTs local
 from ..config import config
 from .sdo_fits import sdo_image_finder
+
+# TYPE ANNOTATIONs
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    import numpy.typing as npt
 
 # API public
 __all__ = ['Data', 'Stereo', 'Sdo']
@@ -22,19 +32,21 @@ __all__ = ['Data', 'Stereo', 'Sdo']
 class Data:
     # todo add docstring
     # todo add the method to get the numpy array corresponding to the images.
-    __slots__ = ('raw', 'avg', 'mask')
+    __slots__ = ('raw', 'avg', 'mask', 'header')
 
     def __init__(
             self,
-            raw: str,
-            avg: str,
-            mask: str | None,
+            raw: npt.NDArray[np.float64],
+            avg: npt.NDArray[np.float64],
+            mask: npt.NDArray[np.bool_] | None = None,
+            header: dict[str, str] | None = None,
         ) -> None:
         # todo add docstring
 
         self.raw = raw
         self.avg = avg
         self.mask = mask
+        self.header = header
 
 
 class Stereo:
@@ -106,7 +118,7 @@ class Stereo:
             raise ValueError(f"Number {number} not found in the stereo images.")
         stamp = (
             f"{match.group('year')}-{match.group('month')}-{match.group('day')}T"
-            f"{match.group('hour')}:{match.group('minute')}:{match.group('second')}"
+            f"{match.group('hour')}:{match.group('minute')}"
         )
         return stamp
 
@@ -127,6 +139,54 @@ class Stereo:
         filepath = os.path.join(Stereo.mask_dir, f'frame{number:04d}.png')
         if not os.path.isfile(filepath): return
         return filepath
+
+    @staticmethod
+    def get_image_raw(number: int) -> npt.NDArray[np.float64]:
+        """
+        Gives the image data as a numpy array.
+
+        Arguments:
+            number -- int.
+                Number of the image.
+
+        Returns:
+            npt.NDArray[np.float64]
+                Image data as a numpy array. Shape: (height, width)
+        """
+        return plt.imread(Stereo.int_paths[number]).mean(axis=-1)
+
+    @staticmethod
+    def get_image_avg(number: int) -> npt.NDArray[np.float64]:
+        """
+        Gives the average image data as a numpy array.
+
+        Arguments:
+            number -- int.
+                Number of the image.
+
+        Returns:
+            npt.NDArray[np.float64]
+                Average image data as a numpy array. Shape: (height, width)
+        """
+        return plt.imread(Stereo.avg_paths[number]).mean(axis=-1)
+
+    @staticmethod
+    def get_mask(number: int) -> npt.NDArray[np.bool_] | None:
+        """
+        Gives the mask data as a numpy array.
+
+        Arguments:
+            number -- int.
+                Number of the image.
+
+        Returns:
+            npt.NDArray[np.bool_] | None
+                Mask data as a numpy array. Shape: (height, width) if it exists, None otherwise.
+        """
+
+        path = Stereo.mask_path(number)
+        if path is None: return
+        return plt.imread(path).max(axis=-1).astype(np.bool_)
 
 
 class Sdo:
@@ -162,7 +222,7 @@ class Sdo:
 
         Arguments:
             timestamp -- str.
-                Timestamp of the image with the format 'YYYY-MM-DDTHH:MM:SS'.
+                Timestamp of the image with the format 'YYYY-MM-DDTHH:MM'.
 
         Raises:
             ValueError: If the timestamp is not found in the SDO image finder.
@@ -176,3 +236,59 @@ class Sdo:
         if filepath is None:
             raise ValueError(f"Timestamp {timestamp} not found in the SDO image finder.")
         return filepath
+
+    @staticmethod
+    def get_fits(
+            timestamp: str,
+            nice: bool = True,
+        ) -> tuple[dict[str, str], npt.NDArray[np.float64]]:
+        """
+        Gives the SDO FITS file header and image information.
+
+        Arguments:
+            timestamp -- str.
+                Timestamp of the image with the format 'YYYY-MM-DDTHH:MM'.
+            nice -- bool. (default: True)
+                Whether to apply visualization processing to the data.
+
+        Returns:
+            tuple[dict[str, str], npt.NDArray[np.float64]]
+                Header and image data.
+        """
+
+        # OPEN FITS file
+        filepath = Sdo.fits_path(timestamp)
+        hdul = fits.open(filepath)
+        header = hdul[1].header
+        data = hdul[1].data.astype(np.float64)  # todo make sure this doesn't fuck up
+        hdul.close()
+
+        # VISUALIZATION processing
+        if nice:
+            low, high = np.percentile(data, (0.5, 99.5))
+            data = np.clip(data, max(low, 1), high)
+            data = np.log(data)
+        return header, data
+
+    @staticmethod
+    def get_mask(number: int) -> npt.NDArray[np.bool_] | None:
+        """
+        Gives the mask data as a numpy array.
+
+        Arguments:
+            number -- int.
+                Number of the image.
+
+        Returns:
+            npt.NDArray[np.bool_] | None
+                Mask data as a numpy array. Shape: (height, width) if it exists, None otherwise.
+        ! For header information: use the header info from the corresponding data FITS.
+        """
+
+        # CHECK if it exists
+        path = Sdo.mask_path(number)
+        if path is None: return
+
+        # OPEN fits file
+        mask = fits.getdata(path, 0).astype(np.bool_)
+        return mask

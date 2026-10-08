@@ -56,7 +56,7 @@ class Plot:
                 'linewidth': 0.6,
                 'alpha': 0.4,
             },  # todo just put in the the function itself
-            dpi: int = 500,
+            dpi: int = 800,
             verbose: int = 0,
             flush: bool = False,
         ) -> None:
@@ -86,6 +86,7 @@ class Plot:
         Creates the plot and saves it.
         """
 
+        # PLOT config
         fig = plt.figure(figsize=self._fig_size)
         grid = plt.GridSpec(3, 3, wspace=0.001, hspace=0.001)
 
@@ -97,7 +98,7 @@ class Plot:
             fig,
             grid,
             plot_pos=(1, 0), 
-            image=plt.imread(self._stereo_304.raw).mean(axis=-1),
+            image=self._stereo_304.raw,
             mask=None,
             add_grid_label=True,
         )
@@ -105,7 +106,7 @@ class Plot:
             fig,
             grid,
             plot_pos=(1, 1), 
-            image=plt.imread(self._stereo_304.avg).mean(axis=-1),
+            image=self._stereo_304.avg,
             mask=None,
             add_grid_label=False,
         )
@@ -115,7 +116,6 @@ class Plot:
             plot_pos=(1, 2), 
             data=self._sdo_304.raw,
             mask=None,
-            add_grid_label=False,
         )
         # todo add sdo values.
 
@@ -124,33 +124,24 @@ class Plot:
             fig,
             grid,
             plot_pos=(2, 0), 
-            image=plt.imread(self._stereo_304.raw).mean(axis=-1),
-            mask=(
-                plt.imread(self._stereo_304.mask).max(axis=-1)
-                if self._stereo_304.mask is not None
-                else None
-            ),
+            image=self._stereo_304.raw,
+            mask=self._stereo_304.mask if self._stereo_304.mask is not None else None,
             add_grid_label=True,
         )
         self._add_stereo_304_plot(
             fig,
             grid,
             plot_pos=(2, 1), 
-            image=plt.imread(self._stereo_304.avg).mean(axis=-1),
-            mask=(
-                plt.imread(self._stereo_304.mask).max(axis=-1)
-                if self._stereo_304.mask is not None
-                else None
-            ),
+            image=self._stereo_304.avg,
+            mask=self._stereo_304.mask if self._stereo_304.mask is not None else None,
             add_grid_label=False,
         )
         self._add_sdo_304_plot(  #! placeholder
             fig,
             grid,
-            plot_pos=(1, 2), 
+            plot_pos=(2, 2), 
             data=self._sdo_304.raw,
-            mask=None,
-            add_grid_label=False,
+            mask=self._sdo_304.mask,
         )
 
         # SAVE
@@ -161,7 +152,7 @@ class Plot:
         plt.savefig(
             fname=filepath,
             bbox_inches='tight',
-            pad_inches=0.01,
+            pad_inches=0.,
             dpi=self._dpi,
         )
         plt.close()
@@ -171,9 +162,8 @@ class Plot:
             fig: plt.Figure,
             grid: plt.GridSpec,
             plot_pos: tuple[int, int],
-            data: str,
+            data: npt.NDArray[np.float64],
             mask: npt.NDArray[np.bool_] | None,
-            add_grid_label: bool = False,
         ) -> None:
         # todo add docstring
 
@@ -181,15 +171,13 @@ class Plot:
         ax = fig.add_subplot(grid[plot_pos])
         ax.axis('off')
 
-        # IMAGE
-        hdul = fits.open(data)
-        ax.imshow(hdul[0].data)
+        ax.imshow(data, interpolation='none', cmap='gray')
 
         # # CONTOUR
-        # if mask is not None: self._add_contour(ax, mask)
+        if mask is not None: self._add_contour(ax, mask)
 
         # # GRID
-        # self._add_grid_stereo(ax, add_grid_label)
+        # self._add_grid_stereo(ax, False)
 
     def _add_stereo_304_plot(  # ! could be also for 171 if same image lon lat
             self,
@@ -228,7 +216,7 @@ class Plot:
         """
 
         lines = cPlot.contours(mask)
-        for line in lines: ax.plot(line[1], line[0], color='r', linewidth=.5, alpha=.6)
+        for line in lines: ax.plot(line[1], line[0], color='r', linewidth=.3, alpha=.6)
 
     def _add_grid_stereo(self, ax: plt.Axes, add_label: bool = False) -> None:
         """

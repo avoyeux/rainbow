@@ -36,24 +36,34 @@ class Create:
         Creates a single 3*3 image plot.
         """
 
+        # INFO general
         number = Stereo.number(self._index)
         if number is None:
             raise ValueError(
                 f"The string {os.path.basename(Stereo.int_paths[self._index])} has the wrong format."
             )
-
         timestamp = Stereo.timestamp(number)
 
-        # PATHs
+        # DATA
+        stereo_304_raw = Stereo.get_image_raw(number)
+        stereo_304_avg = Stereo.get_image_avg(number)
+        stereo_304_mask = Stereo.get_mask(number)
+
+        sdo_304 = Sdo.get_fits(timestamp)
+        sdo_304_header = sdo_304[0]
+        sdo_304_data = sdo_304[1]
+        sdo_304_mask = Sdo.get_mask(number)
+
+        # FORMAT
         stereo_171 = Data(
             raw='', # ! placeholder
             avg='', # ! placeholder
             mask=None,
         )
         stereo_304 = Data(
-            raw=Stereo.int_paths[self._index],
-            avg=Stereo.avg_paths[self._index],
-            mask=Stereo.mask_path(number),
+            raw=stereo_304_raw,
+            avg=stereo_304_avg,
+            mask=stereo_304_mask,
         )
         sdo_171 = Data(
             raw='', # ! placeholder
@@ -61,9 +71,9 @@ class Create:
             mask=None,
         )
         sdo_304 = Data(
-            raw=Sdo.fits_path(timestamp),
-            avg='', # ! placeholder
-            mask=Sdo.mask_path(number),
+            raw=sdo_304_data,
+            avg=None, #type:ignore #! no avg exists 
+            mask=sdo_304_mask,
         )
 
         # PLOT
