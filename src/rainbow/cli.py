@@ -16,14 +16,14 @@ from common import Decorators
 
 # IMPORTs local
 from .config import config
-from .commands import DataSaver, K3dAnimation, SDOProject, Contour
+from .commands import DataSaver, K3dAnimation, SDOProject, Contour, PngToVideo
 
 # TYPE ANNOTATIONs
 from typing import Any, TYPE_CHECKING
 if TYPE_CHECKING: from argparse import Namespace
 
 # API public
-__all__ = ['create', 'vis', 'project', 'contour']
+__all__ = ['create', 'vis', 'project', 'contour', 'video']
 
 
 
@@ -81,7 +81,7 @@ def create() -> None:
     ? should I add more arguments ?
     """
 
-    print('\033[1;0mCreating the HDF5 data file...\033[0m', flush=True)
+    print('\033[90mCreating the HDF5 data file...\033[0m', flush=True)
     parser = argparse.ArgumentParser(description='Create the HDF5 data file.')
 
     # KWARGs
@@ -94,7 +94,7 @@ def create() -> None:
 def project() -> None:
     # todo add docstring
 
-    print('\033[1;0mProjecting SDO data...\033[0m', flush=True)
+    print('\033[90mProjecting SDO data...\033[0m', flush=True)
     parser = argparse.ArgumentParser(description='Project SDO data.')
 
     # KWARGs
@@ -107,7 +107,7 @@ def project() -> None:
 def vis() -> None:
     # todo add docstring
 
-    print('\033[1;0mStarting 3D visualization...\033[0m', flush=True)
+    print('\033[90mStarting 3D visualization...\033[0m', flush=True)
     parser = argparse.ArgumentParser(description='3D visualization.')
 
     # KWARGs
@@ -122,7 +122,7 @@ def contour() -> None:
     Creates the 3*3 contour plot.
     """
 
-    print('\033[1;0mCreating the 3*3 contours plot...\033[0m', flush=True)
+    print('\033[90mCreating the 3*3 contours plot...\033[0m', flush=True)
     parser = argparse.ArgumentParser(description='Create the 3*3 contours plot.')
 
     # KWARGs
@@ -130,3 +130,21 @@ def contour() -> None:
 
     # RUN
     Contour(**params)
+
+@Decorators.running_time
+def video() -> None:
+    """
+    Creates an MP4 video from a given directory full of PNG images.
+    """
+
+    print('\033[90mCreating the video...\033[0m', flush=True)
+    parser = argparse.ArgumentParser(description='Create the video.')
+
+    # KWARGs
+    params = default_args(parser, config.file.video)
+
+    # EXCEPTION
+    for no_key in ['verbose', 'flush']: params.pop(no_key, None)
+
+    # RUN
+    PngToVideo(**params)

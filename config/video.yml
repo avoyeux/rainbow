@@ -1,0 +1,13 @@
+# KEYWORD ARGUMENTs for the 'video' command.
+video_name: 'test.mp4'
+png_dir: &dir '/home/avoyeux/rainbow/data/output/results/contours'
+output_dir: *dir
+fps: 16
+crf: 18
+png_pattern: 'frame%04d.png'
+extra_args:  # making sure that the number of pixels is even
+  - '-vf'
+  - 'pad=ceil(iw/2)*2:ceil(ih/2)*2'
+
+# CONFIG
+threads: 36
