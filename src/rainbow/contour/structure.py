@@ -25,8 +25,6 @@ if TYPE_CHECKING:
 # API public
 __all__ = ['Data', 'Stereo', 'Sdo']
 
-# todo add the opening of the images directly here
-
 
 
 class Data:
@@ -186,7 +184,7 @@ class Stereo:
 
         path = Stereo.mask_path(number)
         if path is None: return
-        return plt.imread(path).max(axis=-1).astype(np.bool_)
+        return ~plt.imread(path).max(axis=-1).astype(np.bool_)
 
 
 class Sdo:
@@ -259,6 +257,11 @@ class Sdo:
         # OPEN FITS file
         filepath = Sdo.fits_path(timestamp)
         hdul = fits.open(filepath)
+
+        # REPAIR malformed OSCNMEAN
+        hdul.verify('silentfix')
+
+        # GET info
         header = hdul[1].header
         data = hdul[1].data.astype(np.float64)  # todo make sure this doesn't fuck up
         hdul.close()

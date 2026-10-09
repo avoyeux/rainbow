@@ -1,5 +1,4 @@
 # KEYWORD ARGUMENTs for the jupyter-notebook visualization.
-
 time_interval: 6
 polynomial_order:
   - 4

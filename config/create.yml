@@ -1,5 +1,4 @@
 # KEYWORD ARGUMENTs for the hdf5 command.
-
 filename: 'data.h5'
 integration_time: [6]
 polynomial_points: 1_000_000

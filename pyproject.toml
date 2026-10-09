@@ -77,7 +77,6 @@ dependencies = [
   "six>=1.17.0",
   "sparse>=0.19.1",
   "stack-data>=0.6.3",
-  "sunpy>=8.0.0",
   "tifffile>=2026.7.31",
   "tqdm>=4.70.0",
   "traitlets>=5.16.1",
@@ -89,9 +88,11 @@ dependencies = [
   "widgetsnbextension>=4.0.15",
   "yarl>=1.24.5",
   "ipykernel>=7.3.0",
+  "sunpy[map]>=8.0.0",
 ]
 
 [project.scripts]
+video = "rainbow.cli:video"
 create = "rainbow.cli:create"
 project = "rainbow.cli:project"
 contour = "rainbow.cli:contour"
