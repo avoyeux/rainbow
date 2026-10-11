@@ -31,7 +31,7 @@ if TYPE_CHECKING: import numpy.typing as npt
 __all__ = ['Plot']
 
 # todo make the dpi and fig size dependent on input images nb pixels
-
+# * found stereo data in /mnt/data6/stereo/lz/
 
 
 class Plot:
