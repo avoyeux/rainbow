@@ -1,0 +1,18 @@
+; 1) STEREO/SECCHI and gen code
+!path = expand_path('+/usr/local/ssw/stereo/secchi') + ':' + !path
+!path = expand_path('+/usr/local/ssw/stereo/gen') + ':' + !path
+
+; 1b) sunspice + its DLM
+!path = expand_path('+/usr/local/ssw/packages/sunspice') + ':' + !path
+register_sunspice_dlm
+
+; 2) Local data tree + calibration files
+setenv, 'SECCHI_DATA_BEHIND=/mnt/data6/stereo/lz/L0/b'
+setenv, 'SECCHI_DATA_AHEAD=/mnt/data6/stereo/lz/L0/a'
+setenv, 'SECCHI_CAL=/usr/local/ssw/stereo/secchi/calibration'
+
+; 3) Script dir
+cd, '/home/avoyeux/rainbow/src/rainbow/idl'
+
+; 4) Run
+.run rainbow_stereob

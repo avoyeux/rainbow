@@ -12,7 +12,8 @@ instr = 'euvib'
 
 scaling = 'linear'
 
-outpath = 'C:\Users\Frédéric Auchère\Documents\01 - Projects\01 - Science\Oscillations\Rainbow\helio_' + wave + '\'
+;outpath = 'C:\Users\Frï¿½dï¿½ric Auchï¿½re\Documents\01 - Projects\01 - Science\Oscillations\Rainbow\helio_' + wave + '\'
+outpath = '/home/avoyeux/rainbow/data/temporary/idl/'
 
 const_init
 
@@ -163,9 +164,9 @@ endelse
   endfor
 
   for in=0, n-1 do begin
-
-    byt = bytscl(call_function(scaling, rebin(frames[*, *, (in-1)>0:(in+1)<(n-1)], 600, 600, 1)), min=scl_mini, max = scl_maxi)
-    ;byt = bytscl(call_function(scaling, frames[*, *, in]), min=scl_mini, max = scl_maxi)
+    print, in
+    ;byt = bytscl(call_function(scaling, rebin(frames[*, *, (in-1)>0:(in+1)<(n-1)], 600, 600, 1)), min=scl_mini, max = scl_maxi)
+    byt = bytscl(call_function(scaling, frames[*, *, in]), min=scl_mini, max = scl_maxi)
 		cube[0, *, *] = byt
 		cube[1, *, *] = byt
 		cube[2, *, *] = byt
