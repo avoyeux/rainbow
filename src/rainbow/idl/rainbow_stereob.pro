@@ -17,7 +17,7 @@ outpath = '/home/avoyeux/rainbow/data/temporary/idl/'
 
 const_init
 
-redo = 0
+redo = 1
 
 lonwidth = 45.0
 latwidth = 45.0
@@ -88,7 +88,7 @@ if redo eq 1 then begin
 		print, in, n
 
 		datainfo = datainfo_template
-		secchi_prep, list_files[in], subhdr, subimg, /use_smask, /nocalfac_butcorrforipsum
+		secchi_prep, list_files[in], subhdr, subimg, /use_smask, /nocalfac_butcorrforipsum, /pointing_off
 		subimg = despike_gen(subimg, tn=8, /low3)
 		datainfo.wavelnth = strtrim(subhdr.wavelnth, 2)
 		datainfo.crpix1 = subhdr.crpix1-1
@@ -137,7 +137,7 @@ endelse
 
 	avg = rebin(helio, npx, npy, 1)
 
-	window, xs=npx, ys=npy
+	window, xs=npx, ys=npy, /pixmap, retain=2
 
 	cube = bytarr(3, npx, npy)
 	byt = auto_bytscl(call_function(scaling, avg), mini=scl_mini, maxi=scl_maxi, minval=0.01, maxval=0.99)
