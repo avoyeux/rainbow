@@ -171,7 +171,7 @@ class DataSaver(BaseHDF5Protuberance):
         # PATHs
         paths = {
             'cubes': config.dir.input.cubes,
-            'intensities': config.dir.input.stereo.int,
+            'intensities': config.dir.input.stereo.wave304.int,
             'sdo': config.dir.input.sdo.fits,
             'stereo info': config.file.stereo_info,
             'save': config.dir.output.hdf5,

@@ -7,6 +7,7 @@ from __future__ import annotations
 import os
 import re
 from glob import glob
+from datetime import datetime, timedelta
 
 # IMPORTs third-party
 import numpy as np
@@ -18,7 +19,7 @@ from ..config import config
 from .sdo_fits import sdo_image_finder
 
 # TYPE ANNOTATIONs
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 if TYPE_CHECKING:
     import numpy.typing as npt
 
@@ -52,13 +53,19 @@ class Stereo:
     Utilities to find and process the stereo images.
     """
 
-    int_paths: list[str] = sorted(glob(
-        os.path.join(config.dir.input.stereo.int, '*.png')
+    int_304: list[str] = sorted(glob(
+        os.path.join(config.dir.input.stereo.wave304.int, '*.png')
     ))
-    avg_paths: list[str] = sorted(glob(
-        os.path.join(config.dir.input.stereo.avg, '*.png')
+    avg_304: list[str] = sorted(glob(
+        os.path.join(config.dir.input.stereo.wave304.avg, '*.png')
     ))
-    mask_dir: str = config.dir.input.stereo.mask_karine
+    int_171: list[str] = sorted(glob(
+        os.path.join(config.dir.input.stereo.wave171.int, '*.png')
+    ))
+    avg_171: list[str] = sorted(glob(
+        os.path.join(config.dir.input.stereo.wave171.avg, '*.png')
+    ))
+    mask_dir: str = config.dir.input.stereo.wave304.mask_karine
 
     pattern = re.compile(
         pattern=r'''
@@ -75,13 +82,15 @@ class Stereo:
     )
 
     @staticmethod
-    def number(index: int) -> int | None:
+    def number(wave: Literal['171', '304'], index: int) -> int | None:
         """
         Gives the number in the filename given the corresponding image index.
         Should be the same integer than 'index', but using this function so that the code still
         works if some files are lost.
 
         Arguments:
+            wave -- Literal['171', '304'].
+                Wavelength of the image to fetch.
             index -- int.
                 Index of the image.
 
@@ -90,16 +99,67 @@ class Stereo:
                 Number in the filename if it exists, None otherwise.
         """
 
-        match = Stereo.pattern.match(os.path.basename(Stereo.int_paths[index]))
+        match = Stereo.pattern.match(os.path.basename(Stereo.int_304[index]))
         if match is None: return
-        return int(match.group('number'))
+        number = int(match.group('number'))
+
+        # 304
+        if wave == '304': return number
+
+        # 171
+        return Stereo._find_171(match)
 
     @staticmethod
-    def timestamp(number: int) -> str:
+    def _find_171(match: re.Match) -> int | None:
+        """
+        Gives, if found, the STEREO 171 file index for the corresponding timestamp.
+        Not found if the closest STEREO 171 file doesn't exist. It should never happen in practice.
+
+        Arguments:
+            match -- re.Match.
+                The regular expression match to the corresponding STEREO 304 filename.
+
+        Returns:
+            int | None
+                Index of the STEREO 171 file if it exists, None otherwise.
+        """
+
+        target = datetime(
+            int(match.group('year')), int(match.group('month')), int(match.group('day')),
+            int(match.group('hour')), int(match.group('minute')), int(match.group('second')),
+        )
+
+        # SETUP
+        best: int | None = None
+        best_delta: timedelta | None = None
+
+        # SEARCH closest date
+        for i, path in enumerate(Stereo.int_171):
+            stamp = Stereo.pattern.match(os.path.basename(path))
+            if stamp is None: continue
+
+            # DATE found
+            now = datetime(
+                int(stamp.group('year')), int(stamp.group('month')), int(stamp.group('day')),
+                int(stamp.group('hour')), int(stamp.group('minute')), int(stamp.group('second')),
+            )
+
+            # DIFF date
+            delta = abs(target - now)
+            if best_delta is None or delta < best_delta: best, best_delta = i, delta
+
+        # CHECK found date
+        if best is None: print(f"{match.group('number')} - 171 not found"); return
+        return best
+
+    @staticmethod
+    def timestamp(wave: Literal['171', '304'], number: int) -> str:
         """
         Gives the timestamp in the filename given the corresponding image index.
 
         Arguments:
+            wave -- Literal['171', '304'].
+                Wavelength of the image to fetch.
             number -- int.
                 Number of the image.
 
@@ -111,7 +171,10 @@ class Stereo:
                 Timestamp in the filename if it exists, None otherwise.
         """
 
-        match = Stereo.pattern.match(os.path.basename(Stereo.int_paths[number]))
+        # PATH
+        path = Stereo.int_171[number] if wave == '171' else Stereo.int_304[number]
+
+        match = Stereo.pattern.match(os.path.basename(path))
         if match is None:
             raise ValueError(f"Number {number} not found in the stereo images.")
         stamp = (
@@ -139,11 +202,13 @@ class Stereo:
         return filepath
 
     @staticmethod
-    def get_image_raw(number: int) -> npt.NDArray[np.float64]:
+    def get_image_raw(wave: Literal['171', '304'], number: int) -> npt.NDArray[np.float64]:
         """
         Gives the image data as a numpy array.
 
         Arguments:
+            wave -- Literal['171', '304'].
+                Wavelength of the image to fetch.
             number -- int.
                 Number of the image.
 
@@ -151,14 +216,18 @@ class Stereo:
             npt.NDArray[np.float64]
                 Image data as a numpy array. Shape: (height, width)
         """
-        return plt.imread(Stereo.int_paths[number]).mean(axis=-1)
+        path = Stereo.int_171[number] if wave == '171' else Stereo.int_304[number]
+        return plt.imread(path).mean(axis=-1)
 
     @staticmethod
-    def get_image_avg(number: int) -> npt.NDArray[np.float64]:
+    def get_image_avg(wave: Literal['171', '304'], number: int) -> npt.NDArray[np.float64]:
         """
+        todo update docstring
         Gives the average image data as a numpy array.
 
         Arguments:
+            wave -- Literal['171', '304'].
+                Wavelength of the image to fetch.
             number -- int.
                 Number of the image.
 
@@ -166,7 +235,8 @@ class Stereo:
             npt.NDArray[np.float64]
                 Average image data as a numpy array. Shape: (height, width)
         """
-        return plt.imread(Stereo.avg_paths[number]).mean(axis=-1)
+        path = Stereo.avg_304[number] if wave == '304' else Stereo.avg_171[number]
+        return plt.imread(path).mean(axis=-1)
 
     @staticmethod
     def get_mask(number: int) -> npt.NDArray[np.bool_] | None:

@@ -32,10 +32,19 @@ dir:
         stereo:
             _path: &_stereo !join [*_input, 'stereo']
 
-            avg: !join [*_stereo, 'avg']
-            int: !join [*_stereo, 'int']
-            mask: !join [*_stereo, 'mask']
-            mask_karine: !join [*_stereo, 'mask_karine']
+            wave171:
+                _path: &_wave171 !join [*_stereo, 'wave171']
+
+                avg: !join [*_wave171, 'avg']
+                int: !join [*_wave171, 'int']
+
+            wave304:
+                _path: &_wave304 !join [*_stereo, 'wave304']
+
+                avg: !join [*_wave304, 'avg']
+                int: !join [*_wave304, 'int']
+                mask: !join [*_wave304, 'mask']
+                mask_karine: !join [*_wave304, 'mask_karine']
 
     output:
         _path: &_output !join [*_dir, 'output']
@@ -46,7 +55,7 @@ dir:
         results:
             _path: &_results !join [*_output, 'results']
 
-            contours: !join [*_results, 'contours']
+            contours: !join [*_results, 'contour']
             envelope: !join [*_results, 'envelope']
             feet: !join [*_results, 'feet']
             volume: !join [*_results, 'volume']

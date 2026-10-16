@@ -68,7 +68,7 @@ class Contour:
         """
 
         # SETUP
-        filepaths = Stereo.int_paths
+        filepaths = Stereo.int_304
         nb_processes = min(self._processes, len(filepaths))
 
         # MULTIPROCESSING
@@ -84,7 +84,8 @@ class Contour:
                 )
                 p.start()
                 processes[i] = p
-                if self._verbose > 3: print(f"Process {i:02d} started", flush=self._flush)
+                if self._verbose > 4:
+                    print(f"\033[90mProcess {i:02d} started\033[0m", flush=self._flush)
             for p in processes: p.join()
 
         # NO MULTIPROCESSING

@@ -30,8 +30,6 @@ if TYPE_CHECKING: import numpy.typing as npt
 # API public
 __all__ = ['Plot']
 
-# todo make the dpi and fig size dependent on input images nb pixels
-# * found stereo data in /mnt/data6/stereo/lz/
 
 
 class Plot:
@@ -51,13 +49,12 @@ class Plot:
             number: int,
             stereo_171: Data,
             stereo_304: Data,
-            sdo_171: Data,
             sdo_304: Data,
             grid_ticks: float = 15.,
             grid_kwargs: dict[str, Any] = {
                 'color': 'white',
                 'linestyle': '--',
-                'linewidth': 0.06,
+                'linewidth': 0.08,
                 'alpha': 0.4,
             },  # todo just put in the the function itself
             same_fov: bool = True,
@@ -69,7 +66,6 @@ class Plot:
         # DATA
         self._stereo_171 = stereo_171
         self._stereo_304 = stereo_304
-        # self._sdo_171 = sdo_171
         self._sdo_304 = sdo_304
 
         # ARGs
@@ -85,29 +81,20 @@ class Plot:
         self._run()
 
         # PRINT
-        if verbose > 0: print(f'{self._number:04d} - Plot created.', flush=flush)
+        if verbose > 0: print(f'\033[92m{self._number:04d} - Plot created.\033[0m', flush=flush)
 
     @property
     def _dpi(self) -> int:
         # todo add docstring
         # todo need to find a way to get the final size of the sdo image being used.
 
-        # SHAPE max final size
-        # row = int(
-        #     max(self._stereo_171.raw.shape[0], self._stereo_171.avg.shape[0]) +
-        #     max(self._stereo_304.raw.shape[0], final_sdo_shape[0]) * 2
-        # )
-        # column = (
-        #     max(self._stereo_171.raw.shape[1], self._stereo_304.raw.shape[1]) +
-        #     max(self._stereo_304.avg.shape[1], self._stereo_171.avg.shape[1]) +
-        #     final_sdo_shape[1]
-        # )
+        # # SHAPE max final size
         row = int(
+            self._stereo_304.raw.shape[0] +
             max(self._stereo_304.raw.shape[0], self._sdo_shape[0]) * 2
         )
         column = (
-            max(0, self._stereo_304.raw.shape[1]) +
-            max(self._stereo_304.avg.shape[1], 0) +
+            self._stereo_304.raw.shape[1] * 2 +
             self._sdo_shape[1]
         )
         return int(max(row, column) * 1.1)  #? should I change it or keep (1, 1) for figsize ?
@@ -119,43 +106,72 @@ class Plot:
 
         # PLOT config
         fig = plt.figure(figsize=(1, 1))
-        grid = plt.GridSpec(3, 3, wspace=0., hspace=0.)
+        grid = fig.add_gridspec(
+            nrows=3,
+            ncols=3,
+            wspace=0.,
+            hspace=0.,
+            left=0.,
+            right=1.,
+            bottom=0.,
+            top=1.,
+        )
 
-        # TOP  # ! still don't have the data for that
+        # TOP
+        self._add_stereo_plot(
+            fig,
+            grid,
+            plot_pos=(0, 0), 
+            image=self._stereo_171.raw,
+            mask=None,
+        )
+        self._add_stereo_plot(
+            fig,
+            grid,
+            plot_pos=(0, 1), 
+            image=self._stereo_171.avg,
+            mask=None,
+        )
+        self._add_stereo_plot(  # ! placeholder
+            fig,
+            grid,
+            plot_pos=(0, 2), 
+            image=np.zeros(self._sdo_shape),
+            mask=None,
+        )
 
         # MID
-        self._add_stereo_304_plot(
+        self._add_stereo_plot(
             fig,
             grid,
             plot_pos=(1, 0), 
             image=self._stereo_304.raw,
             mask=None,
         )
-        self._add_sdo_304_plot(  #! placeholder
+        self._add_sdo_plot(
             fig,
             grid,
             plot_pos=(1, 2), 
             data=self._sdo_304.raw,
             mask=None,
         )
-        # todo add sdo values.
 
         # DOWN
-        self._add_stereo_304_plot(
+        self._add_stereo_plot(
             fig,
             grid,
             plot_pos=(2, 0), 
             image=self._stereo_304.raw,
-            mask=self._stereo_304.mask if self._stereo_304.mask is not None else None,
+            mask=self._stereo_304.mask,
         )
-        self._add_stereo_304_plot(
+        self._add_stereo_plot(
             fig,
             grid,
             plot_pos=(2, 1), 
             image=self._stereo_304.avg,
-            mask=self._stereo_304.mask if self._stereo_304.mask is not None else None,
+            mask=self._stereo_304.mask,
         )
-        self._add_sdo_304_plot(  #! placeholder
+        self._add_sdo_plot(
             fig,
             grid,
             plot_pos=(2, 2), 
@@ -164,7 +180,7 @@ class Plot:
         )
 
         # MID with grid
-        self._add_stereo_304_plot(
+        self._add_stereo_plot(
             fig,
             grid,
             plot_pos=(1, 1), 
@@ -183,10 +199,10 @@ class Plot:
             bbox_inches='tight',
             pad_inches=0.,
             dpi=self._dpi,
-        )  # todo change the images to pdf when for the paper
+        )  # todo change to pdf for the scientific paper
         plt.close()
 
-    def _add_sdo_304_plot(
+    def _add_sdo_plot(
             self,
             fig: plt.Figure,
             grid: plt.GridSpec,
@@ -207,10 +223,11 @@ class Plot:
         # PLOT
         ax = fig.add_subplot(grid[plot_pos], projection=sdo_map)
         sdo_map.plot(axes=ax, interpolation='none', cmap='gray', title=False)
+        ax.set_aspect('auto')  # stretch to fill the square cell despite the 1px mismatch
 
         # CONTOUR
         if mask is not None:
-            mask_map = sunpy.map.Map(mask.astype(np.uint8), self._sdo_304.header)
+            mask_map = sunpy.map.Map(mask.astype(dtype=np.uint8), self._sdo_304.header)
             mask_map = self._crop_sdo_304(mask_map)
             self._add_contour(ax, mask_map.data.astype(np.bool_))
 
@@ -237,7 +254,7 @@ class Plot:
             coord.set_ticklabel_visible(False)
         ax.grid(False)
 
-    def _add_stereo_304_plot(  # ! could be also for 171 if same image lon lat
+    def _add_stereo_plot(  # ! could be also for 171 if same image lon lat
             self,
             fig: plt.Figure,
             grid: plt.GridSpec,
@@ -331,6 +348,14 @@ class Plot:
                 ax.text(
                     x=pos - 45,
                     y=610,
+                    s=text,
+                    size=1,
+                    color='black',
+                    alpha=0.8,
+                )
+                ax.text(
+                    x=pos - 45,
+                    y=10,
                     s=text,
                     size=1,
                     color='black',

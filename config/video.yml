@@ -1,8 +1,8 @@
 # KEYWORD ARGUMENTs for the 'video' command.
 video_name: 'test.mp4'
-png_dir: &dir '/home/avoyeux/rainbow/data/output/results/contours'
+png_dir: &dir '/home/avoyeux/rainbow/data/output/results/contour'
 output_dir: *dir
-fps: 16
+fps: 8
 crf: 18
 png_pattern: 'frame%04d.png'
 extra_args:  # making sure that the number of pixels is even
