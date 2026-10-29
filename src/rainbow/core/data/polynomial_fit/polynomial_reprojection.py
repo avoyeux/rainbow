@@ -17,7 +17,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # IMPORTs local
-from ...config import config
+from rainbow.config import config
 from ...projection.format_data import FitWithEnvelopes, FitEnvelopes, EnvelopeInformation
 from ...projection.helpers.extract_envelope import CreateFitEnvelope
 from ...projection.helpers.base_reprojection import BaseReProjection

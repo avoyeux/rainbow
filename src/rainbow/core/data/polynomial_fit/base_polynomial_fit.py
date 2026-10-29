@@ -19,7 +19,7 @@ import numpy as np
 from common import Decorators
 
 # IMPORTs local
-from ...config import config
+from rainbow.config import config
 from ...miscellaneous.shared_memory import Shared
 
 # TYPE ANNOTATIONs

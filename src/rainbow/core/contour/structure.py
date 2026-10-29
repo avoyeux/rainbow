@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 from astropy.io import fits
 
 # IMPORTs local
-from ..config import config
+from ...config import config
 from .sdo_fits import sdo_image_finder
 
 # TYPE ANNOTATIONs

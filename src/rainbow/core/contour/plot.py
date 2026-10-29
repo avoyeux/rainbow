@@ -20,7 +20,7 @@ from sunpy.coordinates import HeliographicCarrington, SphericalScreen
 from common import Plot as cPlot
 
 # IMPORTs local
-from ..config import config
+from ...config import config
 from .structure import Data
 
 # TYPE ANNOTATIONs

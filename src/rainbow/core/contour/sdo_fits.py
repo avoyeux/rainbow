@@ -7,7 +7,7 @@ from __future__ import annotations
 import os
 
 # IMPORTs local
-from ..config import config
+from ...config import config
 
 # API public
 __all__ = ['sdo_image_finder']

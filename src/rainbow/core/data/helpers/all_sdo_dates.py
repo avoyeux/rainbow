@@ -17,7 +17,7 @@ from sitools2 import SdoClientMedoc  # IAS package for the SDO data
 from common import Decorators
 
 # IMPORTs local
-from ...config import config
+from rainbow.config import config
 
 # TYPE ANNOTATIONs
 from typing import cast
