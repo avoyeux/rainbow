@@ -12,11 +12,11 @@ import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
 # IMPORTs local
-from ..projection.format_data import (
+from ..core.projection.format_data import (
     ProcessConstants, ProjectionData, ProjectedData, FitEnvelopes,
 )
-from ..projection.sdo_projection import OrthographicalProjection
-from ..projection.envelope_distance import EnvelopeDistanceAnnotation
+from ..core.projection.sdo_projection import OrthographicalProjection
+from ..core.projection.envelope_distance import EnvelopeDistanceAnnotation
 
 # TYPE ANNOTATIONs
 from typing import cast, Any

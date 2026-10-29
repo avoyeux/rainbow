@@ -13,7 +13,7 @@ from __future__ import annotations
 import multiprocessing as mp
 
 # IMPORTs local
-from ..contour import Create, Stereo
+from ..core.contour import Create, Stereo
 
 # TYPE ANNOTATIONs
 from ..typing import CounterType

@@ -24,7 +24,7 @@ from common import Decorators, Plot
 
 # IMPORTs local
 from ..config import config
-from ..animation.animation_dataclasses import (
+from ..core.anim.animation_dataclasses import (
     CubesData, CubesConstants, CubeInfo, FakeCubeInfo, UniqueCubeInfo,
     PolynomialData, UniquePolynomialData,
 )

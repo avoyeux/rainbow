@@ -5,9 +5,11 @@ velocity and so on.
 Furthermore, the corresponding plotting function is here.
 """
 
-# Imports 
+# IMPORTs standard
 import os
 import re
+
+# IMPORTs third party
 
 import numpy as np
 import pandas as pd

@@ -29,10 +29,10 @@ from common import Decorators, CustomDate
 
 # IMPORTs local
 from ..config import config
-from rainbow.miscellaneous.shared_memory import Shared
-from rainbow.data.helpers.all_sdo_dates import AllSDOMetadata
-from rainbow.data.polynomial_fit.base_polynomial_fit import Polynomial
-from rainbow.data.base_hdf5_creator import VolumeInfo, BaseHDF5Protuberance
+from ..core.miscellaneous.shared_memory import Shared
+from ..core.data.helpers.all_sdo_dates import AllSDOMetadata
+from ..core.data.polynomial_fit.base_polynomial_fit import Polynomial
+from ..core.data.base_hdf5_creator import VolumeInfo, BaseHDF5Protuberance
 
 # TYPE ANNOTATIONs
 from typing import Any, Callable, cast, TYPE_CHECKING
