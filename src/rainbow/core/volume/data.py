@@ -41,10 +41,10 @@ class Data:
             int: the time index of the cube.
         """
 
-        indexes = np.flatnonzero(self.dates == date)
-        if indexes.size == 0:
+        index = int(np.searchsorted(self.dates, date))
+        if index == self.dates.size or self.dates[index] != date:
             raise ValueError(f"date '{date}' not found in the 'Dates' dataset")
-        return int(indexes[0])
+        return index
 
     def count_voxels(self, date: str) -> int:
         """
