@@ -16,7 +16,7 @@ from common import Decorators
 
 # IMPORTs local
 from .config import config
-from .commands import DataSaver, K3dAnimation, SDOProject, Contour, PngToVideo
+from .commands import Create, K3dAnimation, SDOProject, Contour, PngToVideo
 
 # TYPE ANNOTATIONs
 from typing import Any, TYPE_CHECKING
@@ -88,7 +88,7 @@ def create() -> None:
     params = default_args(parser, config.file.create)
 
     # RUN
-    DataSaver(**params)
+    Create(**params)
 
 @Decorators.running_time
 def project() -> None:

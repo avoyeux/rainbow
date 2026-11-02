@@ -46,7 +46,7 @@ if TYPE_CHECKING:
     from ..typing import QueueType
 
 # API public
-__all__ = ['DataSaver']
+__all__ = ['Create']
 
 # todo change the code so each cube processing is done in a separate process
 # todo descriptions change as dates changed and (e.g. raw data) most cube indexes contain no data
@@ -54,7 +54,7 @@ __all__ = ['DataSaver']
 
 
 
-class DataSaver(BaseHDF5Protuberance):
+class Create(BaseHDF5Protuberance):
     """
     To create cubes with and/or without feet in an HDF5 file.
     """
@@ -1080,7 +1080,7 @@ class DataSaver(BaseHDF5Protuberance):
 
         # DATA fetch
         with h5py.File(filepath, 'r', locking=False) as H5PYFile:
-            data = DataSaver.get_COO(H5PYFile, path_data.removesuffix(' with feet'))
+            data = Create.get_COO(H5PYFile, path_data.removesuffix(' with feet'))
 
         while True:
             # CHECK queue
@@ -1093,7 +1093,7 @@ class DataSaver(BaseHDF5Protuberance):
             date_max = date + integration_time / 2.
 
             # RESULTs save
-            chunk = DataSaver.cube_integration(data, date_max, date_min, dates_seconds)
+            chunk = Create.cube_integration(data, date_max, date_min, dates_seconds)
             output_queue.put((index, chunk))
 
     @staticmethod
@@ -1278,7 +1278,7 @@ class DataSaver(BaseHDF5Protuberance):
 
             # SAVE
             result = np.transpose(result, (2, 1, 0))
-            output_queue.put((cube_number, DataSaver.sparse_data(result)))
+            output_queue.put((cube_number, Create.sparse_data(result)))
 
     @staticmethod
     def sparse_data(cubes: np.ndarray) -> sparse.COO:
@@ -1556,7 +1556,7 @@ class DataSaver(BaseHDF5Protuberance):
 
 if __name__=='__main__':
 
-    instance = DataSaver(
+    instance = Create(
         filename='test.h5',
         processes=32,
         integration_time=[3, 6, 12, 24],
