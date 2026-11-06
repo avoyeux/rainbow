@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     import numpy.typing as npt
 
 # API public
-__all__ = ['Data']
+__all__ = ['Data', 'PData']
 
 
 
@@ -80,3 +80,13 @@ class Data:
             np.float64: the number of voxels times the voxel volume.
         """
         return self.count_voxels(date) * self.voxel_volume_km3()
+
+
+@dataclass(slots=True, repr=False, eq=False, match_args=False)
+class PData:
+    """
+    Information needed for each dataset in the plot.
+    """
+
+    hours: npt.NDArray[np.float32]
+    values: npt.NDArray[np.float32]
