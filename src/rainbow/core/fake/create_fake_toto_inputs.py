@@ -22,9 +22,12 @@ from common import Decorators
 from rainbow.config import config
 
 # TYPE ANNOTATIONs
-from typing import Any
-type LockProxy = Any
-type ValueProxy = Any
+from typing import Any, TYPE_CHECKING
+if TYPE_CHECKING:
+    from rainbow.typing import CounterType
+
+# API public
+__all__ = ['CreateFakeTotoInputs']
 
 
 
@@ -190,41 +193,38 @@ class CreateFakeTotoInputs:
         processes_nb = min(self.processes, self.fake_len)
 
         if processes_nb > 1:
-            manager = mp.Manager()
-            lock = manager.Lock()
-            value = manager.Value('i', 0)
+            counter = mp.Value('i', 0)
 
             # MULTIPROCESSING run
             processes: list[mp.Process] = [None] * processes_nb  #type:ignore
             for i in range(processes_nb):
                 p = mp.Process(
                     target=self.sdo_fake_data_multiprocessing,
-                    kwargs={'value': value, 'lock': lock},
+                    args=(counter,),
                 )
                 p.start()
                 processes[i] = p
             for p in processes: p.join()
-            manager.shutdown()
         else:
             # NO MULTIPROCESSING
             for i in range(self.fake_len): self.create_sun_image_sdo(index=i)
 
-    def sdo_fake_data_multiprocessing(self, value: ValueProxy, lock: LockProxy) -> None:
+    def sdo_fake_data_multiprocessing(self, counter: CounterType[int]) -> None:
         """
         To create the fake data for the SDO masks in multiprocessing.
 
         Args:
-            value (ValueProxy): A value proxy from the multiprocessing.Manager class.
-            lock (LockProxy): A lock proxy from the multiprocessing.Manager class.
+            counter -- CounterType[int]
+                A counter proxy from the multiprocessing.Manager class.
         """
 
         while True:
-            # COUNTER value
-            with lock:
-                index = value.value
+            # NEXT
+            with counter.get_lock():
+                index = counter.value
                 if index >= self.fake_len: return
-                value.value += 1
-            
+                counter.value += 1
+
             self.create_sun_image_sdo(index)
 
     def create_sun_image_sdo(self, index: int) -> None:
