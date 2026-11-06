@@ -52,6 +52,12 @@ dir:
         hdf5: &_hdf5 !join [*_output, 'hdf5']
         mp4_saves: !join [*_output, 'mp4_saves']
 
+        fake:
+            _path: &_fake !join [*_output, 'fake']
+
+            png: !join [*_fake, 'png']
+            fits: !join [*_fake, 'fits']
+
         results:
             _path: &_results !join [*_output, 'results']
 
@@ -77,6 +83,7 @@ file:
     stereo_info: !join [*_stereo, 'stereo_304.save']
     timestamps: !join [*_input, 'SDO_timestamps.txt']
     data: !join [*_hdf5, 'data.h5']
+    fake: !join [*_fake, 'fake.h5']
 
     # Commands
     _path: &_config !join [*root, 'config']

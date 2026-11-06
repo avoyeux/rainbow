@@ -19,7 +19,7 @@ from astropy.io import fits
 from common import Decorators
 
 # IMPORTs local
-from config import config
+from rainbow.config import config
 
 # TYPE ANNOTATIONs
 from typing import Any
@@ -56,11 +56,14 @@ class CreateFakeTotoInputs:
 
     def __init__(
             self,
-            sphere_radius: float,
+            sphere_radius: list[float],
+            stereo_radii: list[float] | None = None,
+            stereo_width: float = 0.05,
             fake_len: int = 413,
-            processes: int | None = None,
+            processes: int = 2,
         ) -> None:
         """
+        todo update docstring
         To create the fake data inputs for Dr. Auchere's new_toto.pro code.
 
         Args:
@@ -71,11 +74,13 @@ class CreateFakeTotoInputs:
         """
 
         # PROCESSES setup
-        self.processes = config.run.processes if processes is None else processes
+        self.processes = processes
 
         # ATTRIBUTEs
         self.fake_len = fake_len
         self.sphere_radius = sphere_radius
+        self.stereo_radii = [0.6, 0.8] if stereo_radii is None else stereo_radii
+        self.stereo_width = stereo_width
         
         # RUN
         self.paths = self.paths_setup()
@@ -92,14 +97,11 @@ class CreateFakeTotoInputs:
 
         # PATHs formatting
         paths = {
-            'stereo files': config.path.dir.data.stereo.mask.karine,
-            'sdo files': config.path.dir.data.sdo,
-            'save fits': config.path.dir.data.fake.fits,
-            'save png': config.path.dir.data.fake.png,
+            'stereo files': config.dir.input.stereo.wave304.mask_karine,
+            'sdo files': config.dir.input.sdo.mask,
+            'save fits': config.dir.output.fake.fits,
+            'save png': config.dir.output.fake.png,
         }
-
-        # PATHs create
-        for key in ['save fits', 'save png']: os.makedirs(paths[key], exist_ok=True)
         return paths
 
     @Decorators.running_time
@@ -108,13 +110,75 @@ class CreateFakeTotoInputs:
         To create the fake data for the STEREO masks.
         """
 
-        real_image = PIL.Image.open(os.path.join(self.paths['stereo files'], 'frame0000.png'))
-        fake_image = np.zeros(real_image.size, dtype=np.uint8)
-        real_image.close()
+        with PIL.Image.open(os.path.join(self.paths['stereo files'], 'frame0000.png')) as real:
+            width, height = real.size  # (W, H)
 
         for index in range(self.fake_len):
-            image = PIL.Image.fromarray(fake_image)
-            image.save(os.path.join(self.paths['save png'], f'frame{index:04d}.png'))
+            image = self.arc_image(width=width, height=height)
+            PIL.Image.fromarray(image).save(
+                os.path.join(self.paths['save png'], f'frame{index:04d}.png'),
+            )
+
+    def arc_image(self, width: int, height: int) -> np.ndarray:
+        """
+        To create an RGB mask image made of the fake circle arcs.
+
+        Args:
+            width (int): the width of the image in pixels.
+            height (int): the height of the image in pixels.
+
+        Returns:
+            np.ndarray: the (height, width, 3) uint8 mask image. The background (excluded) is
+                white and the arcs (kept) are black.
+        """
+
+        # BACKGROUND excluded (white)
+        image = np.full((height, width, 3), 255, dtype=np.uint8)
+
+        # ARCs kept (black)
+        scale = min(width, height) / 2
+        center = (width / 2, height / 2)
+        for radius in self.stereo_radii:
+            self.draw_arc(
+                image=image,
+                center=center,
+                radius=radius * scale,
+                width=self.stereo_width * scale,
+            )
+        return image
+
+    def draw_arc(
+            self,
+            image: np.ndarray,
+            center: tuple[float, float],
+            radius: float,
+            width: float,
+        ) -> None:
+        """
+        To draw a half circle arc (kept pixels) on the mask image, with its apex pointing left.
+
+        Args:
+            image (np.ndarray): the (height, width, 3) mask image to draw onto.
+            center (tuple[float, float]): the (x, y) center of the arc in pixels.
+            radius (float): the radius of the arc in pixels.
+            width (float): the radial width of the arc in pixels.
+        """
+
+        # COORDs half circle apex left
+        num_theta = max(4000, int(radius * np.pi * 4))
+        theta = np.linspace(np.pi / 2, 3 * np.pi / 2, num=num_theta)
+
+        # RADII with width
+        offsets = np.arange(-width / 2, width / 2 + 0.5, 0.5)
+        radii = radius + offsets[:, None]
+
+        # COORDs cartesian
+        x = np.round(center[0] + radii * np.cos(theta)).astype(int)
+        y = np.round(center[1] + radii * np.sin(theta)).astype(int)
+
+        # INDEXEs in bound
+        keep = (x >= 0) & (x < image.shape[1]) & (y >= 0) & (y < image.shape[0])
+        image[y[keep], x[keep]] = 0
 
     @Decorators.running_time
     def create_sdo_fake_data(self) -> None:
@@ -144,7 +208,7 @@ class CreateFakeTotoInputs:
         else:
             # NO MULTIPROCESSING
             for i in range(self.fake_len): self.create_sun_image_sdo(index=i)
-            
+
     def sdo_fake_data_multiprocessing(self, value: ValueProxy, lock: LockProxy) -> None:
         """
         To create the fake data for the SDO masks in multiprocessing.
@@ -162,7 +226,7 @@ class CreateFakeTotoInputs:
                 value.value += 1
             
             self.create_sun_image_sdo(index)
-        
+
     def create_sun_image_sdo(self, index: int) -> None:
         """
         To create the fake fits file image.
@@ -186,21 +250,23 @@ class CreateFakeTotoInputs:
             resolution_arcsec=hdu.header['CDELT1'],
             d_sun=hdu.header['DSUN_OBS'],
         )
-        
-        # COORDs sun
-        x, y = self.circle(sdo_info.dx)
 
         # SUN IMAGE creation
         image = np.zeros(hdu.data.shape, dtype=np.uint8)
-        x_indexes = (x / sdo_info.dx) + sdo_info.sun_center[0]
-        y_indexes = (y / sdo_info.dx) + sdo_info.sun_center[1]
 
-        # INDEXEs positive integers
-        x_indexes = np.round(x_indexes).astype(int)
-        y_indexes = np.round(y_indexes).astype(int)
+        for radius in self.sphere_radius:
+            # COORDs sun
+            x, y = self.circle(radius, sdo_info.dx)
 
-        # SAVE image
-        image[y_indexes, x_indexes] = 1
+            x_indexes = (x / sdo_info.dx) + sdo_info.sun_center[0]
+            y_indexes = (y / sdo_info.dx) + sdo_info.sun_center[1]
+
+            # INDEXEs positive integers
+            x_indexes = np.round(x_indexes).astype(int)
+            y_indexes = np.round(y_indexes).astype(int)
+
+            # SAVE image
+            image[y_indexes, x_indexes] = 1
         # self.plot(image)
         fake_hdul[0].data = image
 
@@ -222,11 +288,12 @@ class CreateFakeTotoInputs:
         plt.savefig('test.png', dpi=800)
         plt.close()
 
-    def circle(self, resolution: float) -> np.ndarray:
+    def circle(self, radius: float, resolution: float) -> np.ndarray:
         """
         To create the cartesian coordinates of a circle.
 
         Args:
+            radius (float): the radius of the circle in km.
             resolution (float): the resolution of the SDO image in km.
 
         Returns:
@@ -234,7 +301,7 @@ class CreateFakeTotoInputs:
         """
 
         # COORDs polar
-        r = np.arange(0, self.sphere_radius, resolution / 8)
+        r = np.arange(0, radius, resolution / 8)
         theta = np.linspace(0, 2 * np.pi, len(r))
         r, theta = np.meshgrid(r, theta)
 
@@ -247,4 +314,4 @@ class CreateFakeTotoInputs:
 
 if __name__=='__main__':
 
-    CreateFakeTotoInputs(sphere_radius=6.96e5)
+    CreateFakeTotoInputs(sphere_radius=[7e5, 7.2e5])
