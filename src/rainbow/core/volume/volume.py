@@ -6,6 +6,7 @@ from __future__ import annotations
 # IMPORTs standard
 import re
 import os
+import multiprocessing as mp
 from glob import glob
 from dataclasses import dataclass
 from datetime import datetime, time
@@ -27,6 +28,7 @@ from rainbow.config import config
 # TYPE ANNOTATIONs
 from typing import TYPE_CHECKING, Literal
 if TYPE_CHECKING:
+    from rainbow.typing import QueueType
     import numpy.typing as npt
 
 # API public
@@ -42,14 +44,17 @@ class Volume:
     @Decorators.running_time
     def __init__(
             self,
+            processes: int = 1,
             verbose: int = 0,
             flush: bool = False,
         ) -> None:
         """
-        Computes the voxel volumes and the satellites' field of views.
+        Computes the voxel volumes and the satellites' surfaces.
         From there, it creates the corresponding plot.
 
         Arguments:
+            processes -- int (default: 1)
+                The number of processes to use. When < 2, no multiprocessing is used.
             verbose -- int (default: 0)
                 The verbosity level for the prints.
             flush -- bool (default: False)
@@ -57,6 +62,7 @@ class Volume:
         """
 
         # CONFIG
+        self._processes = processes
         self._verbose = verbose
         self._flush = flush
 
@@ -98,36 +104,54 @@ class Volume:
         To compute the voxel volume of each dataset and create the outputs.
         """
 
-        hours = self._get_hours(self._data['All data'].dates)
+        # VALUEs
+        volume_hours = self._get_hours(self._data['All data'].dates)
         fov_dates = list(self._num.keys())
+        surface_hours = self._get_hours(np.array(fov_dates, dtype=np.str_))
+
         volume = PData(
-            hours=hours,
-            values=np.stack(
+            hours=volume_hours,
+            surface=np.stack(
                 arrays=[self._get_volumes(data) for data in self._data.values()],
                 dtype=np.float32,
             ),
         )
+
+        # MULTIPROCESSING
+        if self._processes > 1:
+            # SURFACEs
+            stereo_surface = self._multiprocess(choice='stereo', fov_dates=fov_dates)
+            sdo_surface = self._multiprocess(choice='sdo', fov_dates=fov_dates)
+        # NO MULTIPROCESSING
+        else:
+            # SURFACEs
+            stereo_surface = [
+                surface
+                if (surface := self._get_surface(self._num, 'stereo', date)) is not None
+                else 0
+                for date in fov_dates
+            ]
+            sdo_surface = [
+                surface
+                if (surface := self._get_surface(self._num, 'sdo', date)) is not None
+                else 0
+                for date in fov_dates
+            ]
+
+        # RE-FORMAT
         stereo = PData(
-            hours=self._get_hours(np.array(fov_dates, dtype=np.str_)),
-            values=np.stack(
-                arrays=[
-                    surface
-                    if (surface := self._get_surface(date, 'Stereo')) is not None
-                    else 0
-                    for date in fov_dates
-                ]
-            )
+            hours=surface_hours,
+            surface=np.stack(
+                arrays=stereo_surface,
+                dtype=np.float32,
+            ),
         )
         sdo = PData(
-            hours=self._get_hours(np.array(fov_dates, dtype=np.str_)),
-            values=np.stack(
-                arrays=[
-                    surface
-                    if (surface := self._get_surface(date, 'SDO')) is not None
-                    else 0
-                    for date in fov_dates
-                ]
-            )
+            hours=surface_hours,
+            surface=np.stack(
+                arrays=sdo_surface,
+                dtype=np.float32,
+            ),
         )
 
         # PLOT
@@ -139,8 +163,11 @@ class Volume:
 
     def _get_hours(self, dates: npt.NDArray[np.str_]) -> npt.NDArray[np.float32]:
         """
-        todo update docstring
         To get the time of each observation in hours since midnight of the first observation.
+
+        Args:
+            dates -- npt.NDArray[np.str_]
+                The dates of the observations.
 
         Returns:
             npt.NDArray[np.float32]: the hours since midnight of the first date.
@@ -194,15 +221,111 @@ class Volume:
         }
         return date_to_num
 
-    def _get_surface(self, date: str, choice: Literal['Stereo', 'SDO']) -> float | None:
-        # todo add docstring
-        # * the dates saved are the ones in stereo B, so use that as the reference.
+    def _multiprocess(self, choice: Literal['stereo', 'sdo'], fov_dates: list[str]) -> list[float]:
+        """
+        Using multiprocessing to get the surface sizes of the corresponding satellite image masks.
+
+        Arguments:
+            choice -- Literal['stereo', 'sdo']
+                The satellite to use.
+            fov_dates -- list[str]
+                The dates of the observations.
+
+        Returns:
+            list[float]: the surface sizes for each date.
+        """
+
+        nb = min(len(fov_dates), self._processes)
+        manager = mp.Manager()
+        input_queue = manager.Queue()
+        output_queue = manager.Queue()
+
+        # POPULATE
+        for item in enumerate(fov_dates): input_queue.put(item)
+        for _ in range(nb): input_queue.put(None)
+
+        # RUN
+        processes: list[mp.Process] = [None] * nb  #type:ignore
+        for i in range(nb):
+            p = mp.Process(
+                target=self._loop,
+                kwargs=dict(
+                    num=self._num,
+                    choice=choice,
+                    input_queue=input_queue,
+                    output_queue=output_queue,
+                )
+            )
+            p.start()
+            processes[i] = p
+        for p in processes: p.join()
+
+        # OUTPUT
+        surfaces: list[float | None] = [None] * len(fov_dates)
+        while not output_queue.empty():
+            index, surface = output_queue.get()
+            surfaces[index] = surface
+        return [value if value is not None else 0. for value in surfaces]
+
+    @staticmethod
+    def _loop(
+            num: dict[str, int],
+            choice: Literal['stereo', 'sdo'],
+            input_queue: QueueType[tuple[int, str] | None],
+            output_queue: QueueType[tuple[int, float | None]],
+        ) -> None:
+        """
+        A single process computing multiple satellite surface mask values.
+
+        Arguments:
+            num -- dict[str, int]
+                The image number corresponding to each date.
+            choice -- Literal['stereo', 'sdo']
+                The satellite to use.
+            input_queue -- QueueType[tuple[int, str] | None]
+                The queue to get the dates to process.
+            output_queue -- QueueType[tuple[int, float | None]]
+                The queue to put the surface sizes.
+        """
+
+        while True:
+            # ARGs
+            args = input_queue.get()
+            if args is None: break
+            index, date = args
+
+            # SURFACE
+            surface = Volume._get_surface(num, choice, date)
+
+            # OUTPUT
+            output_queue.put((index, surface))
+
+    @staticmethod
+    def _get_surface(
+            num: dict[str, int],
+            choice: Literal['stereo', 'sdo'],
+            date: str,
+        ) -> float | None:
+        """
+        To get the surface size of a satellite image mask.
+
+        Arguments:
+            num -- dict[str, int]
+                The image number corresponding to each date.
+            choice -- Literal['stereo', 'sdo']
+                The satellite to use.
+            date -- str
+                The date of the observation.
+
+        Returns:
+            float | None: the surface size in km^2 for the date, or None if the date is not found.
+        """
 
         # CHECK
-        nb = self._num.get(date, None)
+        nb = num.get(date, None)
         if nb is None: return
 
-        if choice == 'SDO':
+        if choice == 'sdo':
             hdul = fits.open(os.path.join(
                 config.dir.input.sdo.mask, f'AIA_fullhead_{nb:03d}.fits.gz',
             ))
@@ -223,4 +346,4 @@ class Volume:
 
 
 if __name__ == '__main__':
-    volume = Volume()
+    volume = Volume(processes=20)

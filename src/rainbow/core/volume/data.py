@@ -89,4 +89,4 @@ class PData:
     """
 
     hours: npt.NDArray[np.float32]
-    values: npt.NDArray[np.float32]
+    surface: npt.NDArray[np.float32]
