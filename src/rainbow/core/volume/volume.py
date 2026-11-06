@@ -15,6 +15,7 @@ from datetime import datetime, time
 import h5py
 import numpy as np
 from PIL import Image
+from scipy.io import readsav
 from astropy.io import fits
 
 # IMPORTs personal
@@ -26,13 +27,16 @@ from .plot import Plot
 from rainbow.config import config
 
 # TYPE ANNOTATIONs
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, Any
 if TYPE_CHECKING:
     from rainbow.typing import QueueType
     import numpy.typing as npt
 
 # API public
 __all__ = ['Volume']
+
+# ! Weird values between sdo and stereo (3 order of magnitude...). No clue why.
+# todo ask if I should take away RSUN from DSUN when computing STEREO surface
 
 
 
@@ -125,15 +129,17 @@ class Volume:
         # NO MULTIPROCESSING
         else:
             # SURFACEs
+            stereo_info = readsav(config.file.stereo_info).datainfos
             stereo_surface = [
                 surface
-                if (surface := self._get_surface(self._num, 'stereo', date)) is not None
+                if (surface := self._get_surface(self._num, date, stereo_info)) is not None
                 else 0
                 for date in fov_dates
             ]
+            stereo_info = None
             sdo_surface = [
                 surface
-                if (surface := self._get_surface(self._num, 'sdo', date)) is not None
+                if (surface := self._get_surface(self._num, date, stereo_info)) is not None
                 else 0
                 for date in fov_dates
             ]
@@ -237,8 +243,8 @@ class Volume:
 
         nb = min(len(fov_dates), self._processes)
         manager = mp.Manager()
-        input_queue = manager.Queue()
-        output_queue = manager.Queue()
+        input_queue: QueueType[tuple[int, str] | None] = manager.Queue()
+        output_queue: QueueType[tuple[int, float | None]] = manager.Queue()
 
         # POPULATE
         for item in enumerate(fov_dates): input_queue.put(item)
@@ -288,6 +294,12 @@ class Volume:
                 The queue to put the surface sizes.
         """
 
+        # OPEN stereo info
+        if choice == 'stereo':
+            stereo_info = readsav(config.file.stereo_info).datainfos
+        else:
+            stereo_info = None
+
         while True:
             # ARGs
             args = input_queue.get()
@@ -295,7 +307,7 @@ class Volume:
             index, date = args
 
             # SURFACE
-            surface = Volume._get_surface(num, choice, date)
+            surface = Volume._get_surface(num, date, stereo_info)
 
             # OUTPUT
             output_queue.put((index, surface))
@@ -303,8 +315,8 @@ class Volume:
     @staticmethod
     def _get_surface(
             num: dict[str, int],
-            choice: Literal['stereo', 'sdo'],
             date: str,
+            stereo_info: Any = None,
         ) -> float | None:
         """
         To get the surface size of a satellite image mask.
@@ -312,10 +324,10 @@ class Volume:
         Arguments:
             num -- dict[str, int]
                 The image number corresponding to each date.
-            choice -- Literal['stereo', 'sdo']
-                The satellite to use.
             date -- str
                 The date of the observation.
+            stereo_info -- Any
+                The stereo info to use. None when using SDO.
 
         Returns:
             float | None: the surface size in km^2 for the date, or None if the date is not found.
@@ -325,11 +337,18 @@ class Volume:
         nb = num.get(date, None)
         if nb is None: return
 
-        if choice == 'sdo':
+        if stereo_info is None:
+            # OPEN
             hdul = fits.open(os.path.join(
                 config.dir.input.sdo.mask, f'AIA_fullhead_{nb:03d}.fits.gz',
             ))
-            surface = float(np.sum(hdul[0].data * hdul[0].header['CDELT1'] ** 2)) / 3600
+            data = hdul[0].data
+            header = hdul[0].header
+
+            # CONSTANTs
+            d_sun: float = header['RSUN_REF'] / 1000
+            angle: float = header['CDELT1']
+            hdul.close()
         else:
             # CHECK
             path = os.path.join(
@@ -337,13 +356,17 @@ class Volume:
                 f'frame{nb:04d}.png',
             )
             if not os.path.exists(path): return
+            data = ~np.asarray(Image.open(path)).max(axis=-1).astype(np.bool_)
 
-            # SURFACE
-            d_lon = 0.075
-            mask = ~np.asarray(Image.open(path)).max(axis=-1).astype(np.bool_)
-            surface = float(mask.sum() * d_lon ** 2)
+            # CONSTANTs
+            d_sun: float = stereo_info[nb].dist
+            angle = 0.075
+
+        # SURFACE
+        pixel_surface = 4 * d_sun ** 2 * np.tan(angle / 2) ** 2
+        surface = float(np.sum(data) * pixel_surface)
         return surface
 
 
 if __name__ == '__main__':
-    volume = Volume(processes=20)
+    volume = Volume(processes=16)

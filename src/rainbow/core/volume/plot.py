@@ -1,5 +1,5 @@
 """
-Code to plot the voxel volume.
+Code to plot the voxel volume and the satellite surfaces.
 """
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ __all__ = ['Plot']
 
 class Plot:
     """
-    To plot the evolution of the voxel volume over time.
+    To plot the evolution of the voxel volume and the satellite surfaces over time.
     """
 
     def __init__(
@@ -36,15 +36,15 @@ class Plot:
             sdo: PData,
         ) -> None:
         """
-        To plot the voxel volume and the satellite field of views.
+        To plot the voxel volume and the satellite surfaces.
 
         Args:
             volume -- PData
                 The voxel volume.
             stereo -- PData
-                The satellite field of view.
+                The satellite surface in km2.
             sdo -- PData
-                The satellite field of view.
+                The satellite surface in km2.
         """
 
         # PATHs
@@ -70,8 +70,8 @@ class Plot:
         ax3 = ax2.twinx()
 
         # VOLUME range
-        lower = self._volume.values.min(axis=0)
-        upper = self._volume.values.max(axis=0)
+        lower = self._volume.surface.min(axis=0)
+        upper = self._volume.surface.max(axis=0)
         ax1.fill_between(
             label='Volume range',
             x=self._volume.hours,
@@ -96,7 +96,7 @@ class Plot:
         # SDO plot
         ax2.plot(
             self._sdo.hours,
-            self._sdo.values,
+            self._sdo.surface,
             label='SDO fov',
             color='red',
             linewidth=1,
@@ -122,7 +122,7 @@ class Plot:
         # STEREO plot
         ax3.plot(
             self._stereo.hours,
-            self._stereo.values,
+            self._stereo.surface,
             color='green',
             label='STEREO fov',
             linewidth=1,
@@ -146,7 +146,7 @@ class Plot:
             labelcolor='green',
             colors='green',
         )
-        ax3.set_ylabel('Field of view ($arcmin^2$)', color='black')
+        ax3.set_ylabel('Surface ($km^2$)', color='black')
 
         # LEGEND shared
         handles1, labels1 = ax1.get_legend_handles_labels()
@@ -158,5 +158,5 @@ class Plot:
 
         # SAVE
         plt.tight_layout()
-        plt.savefig(os.path.join(self._path, 'volume_range.png'), dpi=1000)
+        plt.savefig(os.path.join(self._path, 'volume.png'), dpi=1000)
         plt.close()

@@ -592,8 +592,8 @@ class Create(BaseHDF5Protuberance):
 
         # SETUP multiprocessing
         manager = mp.Manager()
-        input_queue = manager.Queue()
-        output_queue = manager.Queue()
+        input_queue: QueueType[tuple[int, str] | None] = manager.Queue()
+        output_queue: QueueType[tuple[int, np.ndarray]] = manager.Queue()
         for i in range(self.max_len): input_queue.put((i, data[i]))
         for _ in range(self.nb_processes): input_queue.put(None)
 
