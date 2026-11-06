@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 from astropy import units as u
 
 # IMPORTs local
-from ...config import config
+from rainbow.config import config
 from ..format_data import ImageBorders, PolarImageInfo, ImageInfo
 
 # TYPE ANNOTATIONs

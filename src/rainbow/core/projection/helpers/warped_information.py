@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 from common import Decorators
 
 # IMPORTs local
-from ...config import config
+from rainbow.config import config
 from .warp_sdo_image import WarpSdoImage, EnvelopeProcessing
 from ..format_data import (
     ImageBorders, FitWithEnvelopes, EnvelopeInformation, WarpedInformation,

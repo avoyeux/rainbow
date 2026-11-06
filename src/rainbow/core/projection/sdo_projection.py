@@ -18,7 +18,7 @@ import numpy as np
 from common import Decorators, Plot, root_path
 
 # IMPORTs local
-from ..config import config
+from rainbow.config import config
 from .format_data import (
     GlobalConstants, ProcessConstants, ImageBorders, PolarImageInfo,
     ProjectionData, ProjectedData, CubeInformation, EnvelopeInformation,
@@ -33,7 +33,7 @@ from ..data.polynomial_fit.polynomial_reprojection import ReProjectionProcessedP
 
 # TYPE ANNOTATIONs
 from typing import cast, overload, Literal, Any, TYPE_CHECKING
-if TYPE_CHECKING: from ..typing import QueueType
+if TYPE_CHECKING: from rainbow.typing import QueueType
 
 # API public
 __all__ = ['OrthographicalProjection']

@@ -92,3 +92,4 @@ file:
     project: !join [*_config, 'project.yml']
     contour: !join [*_config, 'contour.yml']
     video: !join [*_config, 'video.yml']
+    volume: !join [*_config, 'volume.yml']

@@ -16,7 +16,7 @@ from PIL import Image
 from typing import cast
 
 # IMPORTs local
-from ...config import config
+from rainbow.config import config
 from ...projection.format_data import ImageBorders, FitEnvelopes, EnvelopeInformation
 
 # API public

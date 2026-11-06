@@ -18,9 +18,6 @@ from PIL import Image
 from scipy.io import readsav
 from astropy.io import fits
 
-# IMPORTs personal
-from common import Decorators
-
 # IMPORTs local
 from .data import Data, PData
 from .plot import Plot
@@ -45,7 +42,6 @@ class Volume:
     To compute the voxel volume of each dataset and create the corresponding plot.
     """
 
-    @Decorators.running_time
     def __init__(
             self,
             processes: int = 1,

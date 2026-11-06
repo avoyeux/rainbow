@@ -16,14 +16,14 @@ from common import Decorators
 
 # IMPORTs local
 from .config import config
-from .commands import Create, K3dAnimation, SDOProject, Contour, PngToVideo
+from .commands import Create, K3dAnimation, SDOProject, Contour, PngToVideo, Volume
 
 # TYPE ANNOTATIONs
 from typing import Any, TYPE_CHECKING
 if TYPE_CHECKING: from argparse import Namespace
 
 # API public
-__all__ = ['create', 'vis', 'project', 'contour', 'video']
+__all__ = ['create', 'vis', 'project', 'contour', 'video', 'volume']
 
 
 
@@ -148,3 +148,19 @@ def video() -> None:
 
     # RUN
     PngToVideo(**params)
+
+@Decorators.running_time
+def volume() -> None:
+    """
+    Creates the volume plot containing the cubes voxels volume range and the mask surface area for
+    STEREO and SDO.
+    """
+
+    print('\033[90mCreating the volume plot...\033[0m', flush=True)
+    parser = argparse.ArgumentParser(description='Create the volume plot.')
+
+    # KWARGs
+    params = default_args(parser, config.file.volume)
+
+    # RUN
+    Volume(**params)
