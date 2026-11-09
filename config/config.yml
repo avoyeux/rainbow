@@ -20,7 +20,7 @@ dir:
         path: &_input !join [*_dir, 'input']
 
         texture: !join [*_input, 'texture']
-        cubes: !join [*_input, 'cubes']
+        cubes: !join [*_input, 'cubes', 'real']
         envelope: !join [*_input, 'envelope']
 
         sdo:  # todo check if png path needed here or in 'output'
