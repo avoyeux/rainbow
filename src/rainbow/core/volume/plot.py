@@ -31,6 +31,7 @@ class Plot:
 
     def __init__(
             self,
+            integration: int,
             volume: PData,
             stereo: PData,
             sdo: PData,
@@ -39,6 +40,8 @@ class Plot:
         To plot the voxel volume and the satellite surfaces.
 
         Args:
+            integration -- int
+                The integration time in hours.
             volume -- PData
                 The voxel volume.
             stereo -- PData
@@ -52,6 +55,7 @@ class Plot:
         os.makedirs(self._path, exist_ok=True)
 
         # DATA
+        self._integration = integration
         self._volume = volume
         self._stereo = stereo
         self._sdo = sdo
@@ -73,12 +77,12 @@ class Plot:
         lower = self._volume.surface.min(axis=0)
         upper = self._volume.surface.max(axis=0)
         ax1.fill_between(
-            label='Volume range',
+            label=f'Volume ({self._integration} hour integration)',
             x=self._volume.hours,
             y1=lower,
             y2=upper,
             color='blue',
-            alpha=0.2,
+            alpha=0.3,
             zorder=1,
             linewidth=0,
         )
@@ -97,10 +101,10 @@ class Plot:
         ax2.plot(
             self._sdo.hours,
             self._sdo.surface,
-            label='SDO fov',
+            label='SDO surface',
             color='red',
             linewidth=1,
-            alpha=0.8,
+            alpha=0.6,
             dashes=(3, 3, 7, 1),
         )
 
@@ -124,9 +128,9 @@ class Plot:
             self._stereo.hours,
             self._stereo.surface,
             color='green',
-            label='STEREO fov',
+            label='STEREO surface',
             linewidth=1,
-            alpha=0.8,
+            alpha=0.6,
             dashes=(2, 1, 5, 3),
         )
 

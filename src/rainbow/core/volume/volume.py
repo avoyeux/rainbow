@@ -44,6 +44,7 @@ class Volume:
 
     def __init__(
             self,
+            integration: int = 1,
             processes: int = 1,
             verbose: int = 0,
             flush: bool = False,
@@ -53,6 +54,8 @@ class Volume:
         From there, it creates the corresponding plot.
 
         Arguments:
+            integration -- int (default: 1)
+                The time integration used in hours.
             processes -- int (default: 1)
                 The number of processes to use. When < 2, no multiprocessing is used.
             verbose -- int (default: 0)
@@ -67,6 +70,7 @@ class Volume:
         self._flush = flush
 
         # INIT
+        self._integration = integration
         self._data = {
             'All data': self._get_data('All data'),
             'No duplicates': self._get_data('No duplicates'),
@@ -88,7 +92,9 @@ class Volume:
 
         with h5py.File(config.file.data, 'r') as handle:
             # group = handle[f'Filtered/{name}']
-            group = handle[f'Time integrated/{name}/Time integration of 6 hours']
+            group = handle[
+                f'Time integrated/{name}/Time integration of {self._integration} hours'
+            ]
             data = Data(
                 coords=group['coords'][...],
                 xt_min=group['xt_min'][...],
@@ -125,17 +131,16 @@ class Volume:
         # NO MULTIPROCESSING
         else:
             # SURFACEs
-            stereo_info = readsav(config.file.stereo_info).datainfos
             stereo_surface = [
                 surface
-                if (surface := self._get_surface(self._num, date, stereo_info)) is not None
+                if (surface := self._get_surface(self._num, date, choice='stereo')) is not None
                 else 0
                 for date in fov_dates
             ]
             stereo_info = None
             sdo_surface = [
                 surface
-                if (surface := self._get_surface(self._num, date, stereo_info)) is not None
+                if (surface := self._get_surface(self._num, date, choice='sdo')) is not None
                 else 0
                 for date in fov_dates
             ]
@@ -158,6 +163,7 @@ class Volume:
 
         # PLOT
         Plot(
+            integration=self._integration,
             volume=volume,
             stereo=stereo,
             sdo=sdo,
@@ -290,12 +296,6 @@ class Volume:
                 The queue to put the surface sizes.
         """
 
-        # OPEN stereo info
-        if choice == 'stereo':
-            stereo_info = readsav(config.file.stereo_info).datainfos
-        else:
-            stereo_info = None
-
         while True:
             # ARGs
             args = input_queue.get()
@@ -303,7 +303,7 @@ class Volume:
             index, date = args
 
             # SURFACE
-            surface = Volume._get_surface(num, date, stereo_info)
+            surface = Volume._get_surface(num, date, choice)
 
             # OUTPUT
             output_queue.put((index, surface))
@@ -312,7 +312,7 @@ class Volume:
     def _get_surface(
             num: dict[str, int],
             date: str,
-            stereo_info: Any = None,
+            choice: Literal['stereo', 'sdo'],
         ) -> float | None:
         """
         To get the surface size of a satellite image mask.
@@ -322,8 +322,8 @@ class Volume:
                 The image number corresponding to each date.
             date -- str
                 The date of the observation.
-            stereo_info -- Any
-                The stereo info to use. None when using SDO.
+            choice -- Literal['stereo', 'sdo']
+                The satellite to use.
 
         Returns:
             float | None: the surface size in km^2 for the date, or None if the date is not found.
@@ -333,17 +333,17 @@ class Volume:
         nb = num.get(date, None)
         if nb is None: return
 
-        if stereo_info is None:
+        if choice == 'sdo':
             # OPEN
             hdul = fits.open(os.path.join(
                 config.dir.input.sdo.mask, f'AIA_fullhead_{nb:03d}.fits.gz',
             ))
-            data = hdul[0].data
+            data = hdul[0].data.astype(np.bool_)
             header = hdul[0].header
 
             # CONSTANTs
-            d_sun: float = header['RSUN_REF'] / 1000
-            angle: float = header['CDELT1']
+            d_sun: float = header['DSUN_REF'] / 1000  # in km
+            angle: float = np.deg2rad(header['CDELT1'] / 3600)  # in rad
             hdul.close()
         else:
             # CHECK
@@ -355,8 +355,8 @@ class Volume:
             data = ~np.asarray(Image.open(path)).max(axis=-1).astype(np.bool_)
 
             # CONSTANTs
-            d_sun: float = stereo_info[nb].dist
-            angle = 0.075
+            d_sun: float = 6.96e5  # solar r in km (as image in heliographic carrington)
+            angle: float = np.deg2rad(0.075)  # in rad
 
         # SURFACE
         pixel_surface = 4 * d_sun ** 2 * np.tan(angle / 2) ** 2

@@ -1,5 +1,7 @@
 # KEYWORD ARGUMENTs for the volume command.
+integration: 1
+
 # CONFIG
-processes: 20
+processes: 16
 verbose: 1
 flush: false
