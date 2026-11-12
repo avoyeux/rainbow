@@ -127,7 +127,7 @@ class Setup:
             'line of sight sdo', 'line of sight stereo',
             'pov sdo', 'pov stereo',
             'fit', 'with feet', 'extended fit',
-            'test points', 'test cube', 'fake data',
+            'test points', 'test cube',
         ]
         choices_kwargs = {
             key: False 
@@ -273,15 +273,15 @@ class Setup:
             )
             # todo will need to add the POV center
 
-        if self._choices['fake data']:
-            cubes.fake_cube = self.get_cube_info(
-                HDF5File=HDF5File,
-                group_path='Fake/Filtered/All data',
-                colour='purple',
-                opacity=0.6,
-                interpolate=False,
-                cube_type='fake',
-            )
+        # if self._choices['fake data']:
+        #     cubes.fake_cube = self.get_cube_info(
+        #         HDF5File=HDF5File,
+        #         group_path='Fake/Filtered/All data',
+        #         colour='purple',
+        #         opacity=0.6,
+        #         interpolate=False,
+        #         cube_type='fake',
+        #     )
 
         if self._choices['test cube']:
             cubes.test_cube = self.get_cube_info(
@@ -303,7 +303,7 @@ class Setup:
         """
 
         # FOV get
-        hdul = fits.open(os.path.join(config.dir.input.sdo.fits, 'AIA_fullhead_000.fits.gz'))
+        hdul = fits.open(os.path.join(config.dir.input.sdo.mask, 'AIA_fullhead_000.fits.gz'))
         image_shape = hdul[0].data.shape
         fov_degrees = image_shape[0] * hdul[0].header['CDELT1'] / 3600
         hdul.close()
@@ -624,7 +624,7 @@ class Setup:
             group_path (str): the hdf5 group path to the data being named.
 
         Raises:
-            ValueError: if the group path is not recognised.
+            ValueError: if the group path is not recognized.
 
         Returns:
             str: the name for the corresponding dataset.
@@ -960,14 +960,22 @@ class K3dAnimation(Setup):
         )
 
         # INDEX translation
+        index = int(self.constants.time_indexes[index])
         translation = (cube.xt_min_index, cube.yt_min_index, cube.zt_min_index)
+        voxels = cube[index][0]
+        print(f'cube shape is {voxels.shape}', flush=True)
 
         plots[0] = k3d.voxels(
-            voxels=cube[index][0].transpose((2, 1, 0)),
+            voxels=voxels.transpose((2, 1, 0)),
             name=cube.name,
             opacity=cube.opacity,
             color_map=[self.color_str_to_hex(cube.colour)],  #type:ignore
             translation=translation,
+            bounds=[
+                0, voxels.shape[0],
+                0, voxels.shape[1],
+                0, voxels.shape[2],
+            ],  # ! problems if first cube is empty, need to find a solution
             **kwargs,
         )
 
@@ -1000,13 +1008,16 @@ class K3dAnimation(Setup):
 
         if cube is not None:
             data = cube[0]
-            reference = np.array([
-                (data[0].shape[0] / 2) + cube.xt_min_index,
-                (data[0].shape[1] / 2) + cube.yt_min_index,
-                (data[0].shape[2] / 2) + cube.zt_min_index,
-            ], dtype='float16')
+            reference = np.array(
+                object=[
+                    (data[0].shape[0] / 2) + cube.xt_min_index,
+                    (data[0].shape[1] / 2) + cube.yt_min_index,
+                    (data[0].shape[2] / 2) + cube.zt_min_index,
+                ],
+                dtype=np.float32,
+            )
         else:
-            reference = np.array([0, 0, 0], dtype='float32')
+            reference = np.array([0, 0, 0], dtype=np.float32)
         return reference
 
     def find_first_cube(self) -> CubeInfo | None:
@@ -1071,6 +1082,8 @@ class K3dAnimation(Setup):
                 print("No 'camera_pos', setting default values.")
                 self.camera_pos = (- distance_to_sun, -0.5 * distance_to_sun, 0)
 
+            print(f'camera_pos: {self.camera_pos}')
+            print(f'_camera_reference: {self._camera_reference}')
             self.plot.camera = [
                 self._camera_reference[0] + self.camera_pos[0], # ! there is an overflow here
                 self._camera_reference[1] + self.camera_pos[1],
@@ -1102,7 +1115,7 @@ class K3dAnimation(Setup):
         z = self._radius_index * np.cos(phi)
 
         # SAVE coords
-        self.sun_points = np.array([x.ravel(), y.ravel(), z.ravel()], dtype='float32').T
+        self.sun_points = np.array([x.ravel(), y.ravel(), z.ravel()], dtype=np.float32).T
 
     def update_plot(self, change: dict[str, Any]) -> None:
         """
@@ -1186,11 +1199,15 @@ class K3dAnimation(Setup):
             # NO DATA
             cubes = [np.zeros((1, 1, 1), dtype='uint8')] * len(plots)
         else:
+            index = int(self.constants.time_indexes[index])
+
             # DATA cube and polynomials
             cubes = cube_info[index]
 
         # PLOTs add data
-        for i, plot in enumerate(plots): plot.voxels = cubes[i].transpose((2, 1, 0))
+        for i, plot in enumerate(plots):
+            plot.voxels = cubes[i].transpose((2, 1, 0))
+            print(f"{index} - {cubes[i].sum()} voxels", flush=True)
 
     def play(self) -> None:
         """

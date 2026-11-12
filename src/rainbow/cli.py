@@ -60,7 +60,8 @@ def default_args(
         default=argparse.SUPPRESS,
         help='Whether to flush the print outputs.',
     )
-    args = parser.parse_args()
+    # args = parser.parse_args()
+    args, _ = parser.parse_known_args()
 
     # YAML initialization
     params: dict[str, Any] = {}
