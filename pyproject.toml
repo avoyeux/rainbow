@@ -89,6 +89,7 @@ dependencies = [
   "yarl>=1.24.5",
   "ipykernel>=7.3.0",
   "sunpy[map]>=8.0.0",
+  "notebook>=7.6.5",
 ]
 
 [project.scripts]
