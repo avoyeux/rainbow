@@ -67,9 +67,9 @@ class Create(BaseHDF5Protuberance):
     def __init__(
             self,
             filename: str  = 'data.h5',
-            integration_time: list[int] = [24],
+            integration_time: list[int] | None = [24],
             polynomial_points: int = int(1e6),
-            polynomial_order: list[int] = [3, 4, 5],
+            polynomial_order: list[int] | None = [3, 4, 5],
             feet_lon_lat: tuple[tuple[float, float], tuple[float, float]] = (
                 (-177, 14.5),
                 (-163.5, -16.5),
@@ -94,8 +94,9 @@ class Create(BaseHDF5Protuberance):
                 the value from the config file. Defaults to None.
             processes (int | None, optional): the number of processes used in the multiprocessing.
                 When None, gets the value from the config file. Defaults to None.
-            integration_time (list[int], optional): the time(s) in hours used in the time
-                integration of the data. Defaults to [24].
+            integration_time (list[int] | None, optional): the time(s) in hours used in the time
+                integration of the data. When None, no time integration is done.
+                Defaults to [24].
             polynomial_points (int, optional): the number of points used when recreating the
                 polynomial gotten from the curve fitting of the data. Defaults to int(1e6).
             polynomial_order (list[int], optional): the order(s) used for the polynomial fit of the
@@ -121,7 +122,7 @@ class Create(BaseHDF5Protuberance):
         """
 
         # MULTIPROCESSING setup
-        self.processes = min(1, int(processes))
+        self.processes = processes
 
         # PARENT
         super().__init__(filename, compression, compression_lvl)
@@ -134,7 +135,9 @@ class Create(BaseHDF5Protuberance):
         self.first_datetime: datetime = self.sdo_metadata[0].date_obs #type:ignore
 
         # ARGUMENTs
-        self.integration_time = [time * 3600 for time in integration_time]
+        self.integration_time = (
+            [time * 3600 for time in integration_time] if integration_time is not None else []
+        )
         self.polynomial_order = polynomial_order
         self.polynomial_points = polynomial_points
         self.feet_sigma = feet_sigma
@@ -428,7 +431,8 @@ class Create(BaseHDF5Protuberance):
             self.integrated_group(H5PYFile, init_borders)
 
             # DATA polynomial
-            self.polynomial_group(H5PYFile)
+            if self.polynomial_order is not None:
+                self.polynomial_group(H5PYFile)
 
     def foundation(self, H5PYFile: h5py.File) -> None:
         """
@@ -1379,11 +1383,12 @@ class Create(BaseHDF5Protuberance):
         }
 
         # N-ORDERs 
-        for n_order in self.polynomial_order:
-            instance = Polynomial(order=n_order, **polynomial_kwargs)
+        if self.polynomial_order is not None:
+            for n_order in self.polynomial_order:
+                instance = Polynomial(order=n_order, **polynomial_kwargs)
 
-            info = instance.get_information()
-            self.add_group(group, info, f'{n_order}th order polynomial')
+                info = instance.get_information()
+                self.add_group(group, info, f'{n_order}th order polynomial')
 
     def with_feet(
             self,
