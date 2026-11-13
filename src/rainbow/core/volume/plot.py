@@ -17,7 +17,11 @@ from .data import PData
 # TYPE ANNOTATIONs
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
+    # IMPORTs third-party
     import numpy.typing as npt
+
+    # IMPORTs local
+    from rainbow.typing import ImageExtension
 
 # API public
 __all__ = ['Plot']
@@ -35,6 +39,7 @@ class Plot:
             volume: PData,
             stereo: PData,
             sdo: PData,
+            extension: ImageExtension = '.png',
         ) -> None:
         """
         To plot the voxel volume and the satellite surfaces.
@@ -48,6 +53,8 @@ class Plot:
                 The satellite surface in km2.
             sdo -- PData
                 The satellite surface in km2.
+            extension -- ImageExtension (default: '.png')
+                The saved plot extension.
         """
 
         # PATHs
@@ -55,6 +62,7 @@ class Plot:
         os.makedirs(self._path, exist_ok=True)
 
         # DATA
+        self._extension = extension
         self._integration = integration
         self._volume = volume
         self._stereo = stereo
@@ -71,7 +79,6 @@ class Plot:
         # SETUP
         fig, ax1 = plt.subplots(figsize=(10, 5))
         ax2 = ax1.twinx()
-        ax3 = ax2.twinx()
 
         # VOLUME range
         lower = self._volume.surface.min(axis=0)
@@ -108,23 +115,8 @@ class Plot:
             dashes=(3, 3, 7, 1),
         )
 
-        # SDO limits
-        ax2.set_ylim(bottom=0)
-
-        # SDO labels
-        ax2.yaxis.set_ticks_position('right')
-        ax2.tick_params(
-            axis='y',
-            left=False,
-            right=True,
-            labelleft=False,
-            labelright=True,
-            labelcolor='red',
-            colors='red',
-        )
-
         # STEREO plot
-        ax3.plot(
+        ax2.plot(
             self._stereo.hours,
             self._stereo.surface,
             color='green',
@@ -134,33 +126,31 @@ class Plot:
             dashes=(2, 1, 5, 3),
         )
 
-        # STEREO limits
-        ax3.set_ylim(bottom=0)
-
-        # STEREO labels
-        ax3.spines['right'].set_position(('axes', 1.04))
-        ax3.yaxis.set_ticks_position('right')
-        ax3.yaxis.set_label_position('right')
-        ax3.tick_params(
+        # SURFACE labels
+        ax2.yaxis.set_ticks_position('right')
+        ax2.tick_params(
             axis='y',
             left=False,
             right=True,
             labelleft=False,
             labelright=True,
-            labelcolor='green',
-            colors='green',
+            labelcolor='black',
+            colors='black',
         )
-        ax3.set_ylabel('Surface ($km^2$)', color='black')
+        ax2.set_ylabel('Surface ($Mm^2$)', color='black')
+        ax2.ticklabel_format(style='sci', axis='y', scilimits=(0, 0))
+
+        # SURFACE limits
+        ax2.set_ylim(bottom=0)
 
         # LEGEND shared
         handles1, labels1 = ax1.get_legend_handles_labels()
         handles2, labels2 = ax2.get_legend_handles_labels()
-        handles3, labels3 = ax3.get_legend_handles_labels()
-        handles = handles1 + handles2 + handles3
-        labels = labels1 + labels2 + labels3
-        fig.legend(handles, labels, loc='upper left')
+        handles = handles1 + handles2
+        labels = labels1 + labels2
+        fig.legend(handles, labels, loc='upper left', bbox_to_anchor=(0.05, 0.95))
 
         # SAVE
         plt.tight_layout()
-        plt.savefig(os.path.join(self._path, 'volume.png'), dpi=1000)
+        plt.savefig(os.path.join(self._path, f'volume{self._extension}'), dpi=1000)
         plt.close()

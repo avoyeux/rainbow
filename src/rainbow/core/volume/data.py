@@ -88,5 +88,5 @@ class PData:
     Information needed for each dataset in the plot.
     """
 
-    hours: npt.NDArray[np.float32]
-    surface: npt.NDArray[np.float32]
+    hours: npt.NDArray[np.float32]  # in hours
+    surface: npt.NDArray[np.float32]  # in Mm^2

@@ -7,7 +7,7 @@ from __future__ import annotations
 import queue
 import multiprocessing.shared_memory
 import multiprocessing.sharedctypes
-from typing import Any
+from typing import Any, Literal
 
 # API public
 __all__ = [
@@ -16,9 +16,11 @@ __all__ = [
     'CounterType',
     'QueueType',
     'SharedMemoryType',
+    'ImageExtension',
 ]
 
 # TYPEs
+type ImageExtension = Literal['.png', '.pdf']
 type VoxelAlias = Any
 type JsLinkAlias = Any
 type CounterType[T] = multiprocessing.sharedctypes.Synchronized[T]

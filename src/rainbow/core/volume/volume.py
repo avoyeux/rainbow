@@ -26,14 +26,11 @@ from rainbow.config import config
 # TYPE ANNOTATIONs
 from typing import TYPE_CHECKING, Literal, Any
 if TYPE_CHECKING:
-    from rainbow.typing import QueueType
+    from rainbow.typing import QueueType, ImageExtension
     import numpy.typing as npt
 
 # API public
 __all__ = ['Volume']
-
-# ! Weird values between sdo and stereo (3 order of magnitude...). No clue why.
-# todo ask if I should take away RSUN from DSUN when computing STEREO surface
 
 
 
@@ -45,6 +42,7 @@ class Volume:
     def __init__(
             self,
             integration: int = 1,
+            extension: ImageExtension = '.png',
             processes: int = 1,
             verbose: int = 0,
             flush: bool = False,
@@ -56,6 +54,8 @@ class Volume:
         Arguments:
             integration -- int (default: 1)
                 The time integration used in hours.
+            extension -- ImageExtension (default: '.png')
+                The saved plot extension.
             processes -- int (default: 1)
                 The number of processes to use. When < 2, no multiprocessing is used.
             verbose -- int (default: 0)
@@ -65,6 +65,7 @@ class Volume:
         """
 
         # CONFIG
+        self._extension = extension
         self._processes = processes
         self._verbose = verbose
         self._flush = flush
@@ -167,6 +168,7 @@ class Volume:
             volume=volume,
             stereo=stereo,
             sdo=sdo,
+            extension=self._extension,
         )
 
     def _get_hours(self, dates: npt.NDArray[np.str_]) -> npt.NDArray[np.float32]:
@@ -326,7 +328,7 @@ class Volume:
                 The satellite to use.
 
         Returns:
-            float | None: the surface size in km^2 for the date, or None if the date is not found.
+            float | None: the surface size in Mm^2 for the date, or None if the date is not found.
         """
 
         # CHECK
@@ -342,8 +344,9 @@ class Volume:
             header = hdul[0].header
 
             # CONSTANTs
-            d_sun: float = header['DSUN_REF'] / 1000  # in km
+            d_sun: float = header['DSUN_REF'] / 1e6  # in Mm
             angle: float = np.deg2rad(header['CDELT1'] / 3600)  # in rad
+
             hdul.close()
         else:
             # CHECK
@@ -355,7 +358,7 @@ class Volume:
             data = ~np.asarray(Image.open(path)).max(axis=-1).astype(np.bool_)
 
             # CONSTANTs
-            d_sun: float = 6.96e5  # solar r in km (as image in heliographic carrington)
+            d_sun: float = 6.96e2  # solar r in Mm (as image in heliographic carrington)
             angle: float = np.deg2rad(0.075)  # in rad
 
         # SURFACE
