@@ -129,7 +129,7 @@ class ParentInfo:
     def __post_init__(self) -> None:
 
         self.name = self.get_name()
-        self.shape = tuple(np.max(self.dataset_coords, axis=1) + 1)
+        self.shape = tuple(int(val) for val in np.max(self.dataset_coords, axis=1) + 1)
 
     def get_name(self) -> str:
         """

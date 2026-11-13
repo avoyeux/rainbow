@@ -245,7 +245,7 @@ class Setup:
             cubes.los_stereo = self.get_cube_info(
                 HDF5File=HDF5File,
                 group_path=path,
-                colour='blue',
+                colour='purple',
                 opacity=0.15,
                 interpolate=False,
             )
@@ -477,7 +477,7 @@ class Setup:
             )
         else:
             raise ValueError(f'cube_type {cube_type} is not implemented.')
-        print(f'FETCHED -- {cube_info.name} data.')
+        print(f'FETCHED -- {cube_info.name}.', flush=True)
         return cube_info
 
     @overload
@@ -932,20 +932,18 @@ class K3dAnimation(Setup):
         # INDEX translation
         index = int(self.constants.time_indexes[index])
         translation = (cube.xt_min_index, cube.yt_min_index, cube.zt_min_index)
-        voxels = cube[index][0]
-        print(f'cube shape is {voxels.shape}', flush=True)
 
         plots[0] = k3d.voxels(
-            voxels=voxels.transpose((2, 1, 0)),
+            voxels=cube[index][0].transpose((2, 1, 0)),
             name=cube.name,
             opacity=cube.opacity,
             color_map=[self.color_str_to_hex(cube.colour)],  #type:ignore
             translation=translation,
             bounds=[
-                0, voxels.shape[0],
-                0, voxels.shape[1],
-                0, voxels.shape[2],
-            ],  # ! problems if first cube is empty, need to find a solution
+                0, cube.shape[1],
+                0, cube.shape[2],
+                0, cube.shape[3],
+            ],
             **kwargs,
         )
 
