@@ -16,32 +16,35 @@ from common import Decorators
 
 # IMPORTs local
 from .config import config
-from .commands import Create, K3dAnimation, SDOProject, Contour, PngToVideo, Volume
+from .commands import Create, K3dAnimation, SDOProject, Contour, PngToVideo, Volume, Fake
 
 # TYPE ANNOTATIONs
 from typing import Any, TYPE_CHECKING
 if TYPE_CHECKING: from argparse import Namespace
 
 # API public
-__all__ = ['create', 'vis', 'project', 'contour', 'video', 'volume']
+__all__ = ['create', 'vis', 'project', 'contour', 'video', 'volume', 'fake']
 
 
 
 def default_args(
-        parser: argparse.ArgumentParser,
+        description: str,
         yaml_path: str,
     ) -> dict[str, Any]:
     """
     Parses the parameters that are common to all the commands.
 
     Arguments:
-        parser -- argparse.ArgumentParser object.
-        yaml_path -- str. Path to the yaml file with the parameters for the command.
+        description -- str.
+            The description of the command.
+        yaml_path -- str.
+            Path to the yaml file with the parameters for the command.
 
     Returns:
         dict[str, Any]. A dictionary of the parameters.
     """
 
+    parser = argparse.ArgumentParser(description=description)
     parser.add_argument(
         '--yaml',
         type=str,
@@ -79,40 +82,45 @@ def default_args(
 def create() -> None:
     """
     Creates the HDF5 file containing the processed data.
-    ? should I add more arguments ?
     """
 
     print('\033[90mCreating the HDF5 data file...\033[0m', flush=True)
-    parser = argparse.ArgumentParser(description='Create the HDF5 data file.')
-
-    # KWARGs
-    params = default_args(parser, config.file.create)
+    params = default_args('Create the HDF5 data file.', config.file.create)
 
     # RUN
     Create(**params)
+
+@Decorators.running_time
+def fake() -> None:
+    """
+    Creates fake masks for the 'new_toto.pro' code.
+    Done to then be able to visualize the no duplicates processing effects.
+    """
+
+    print('\033[90mCreating fake data...\033[0m', flush=True)
+    params = default_args('Fake data.', config.file.fake)
+
+    # RUN
+    Fake(**params)
 
 @Decorators.running_time
 def project() -> None:
     # todo add docstring
 
     print('\033[90mProjecting SDO data...\033[0m', flush=True)
-    parser = argparse.ArgumentParser(description='Project SDO data.')
-
-    # KWARGs
-    params = default_args(parser, config.file.project)
+    params = default_args('Project SDO data.', config.file.project) 
 
     # RUN
     SDOProject(**params)
 
 @Decorators.running_time
 def vis() -> None:
-    # todo add docstring
+    """
+    Function to use in jupyter-notebook to visualize the data cube in 3D.
+    """
 
     print('\033[90mStarting 3D visualization...\033[0m', flush=True)
-    parser = argparse.ArgumentParser(description='3D visualization.')
-
-    # KWARGs
-    params = default_args(parser, config.file.vis)
+    params = default_args('3D visualization.', config.file.vis)
 
     # RUN
     K3dAnimation(**params)
@@ -124,10 +132,7 @@ def contour() -> None:
     """
 
     print('\033[90mCreating the 3*3 contours plot...\033[0m', flush=True)
-    parser = argparse.ArgumentParser(description='Create the 3*3 contours plot.')
-
-    # KWARGs
-    params = default_args(parser, config.file.contour)
+    params = default_args('Create the 3*3 contours plot.', config.file.contour)
 
     # RUN
     Contour(**params)
@@ -139,10 +144,7 @@ def video() -> None:
     """
 
     print('\033[90mCreating the video...\033[0m', flush=True)
-    parser = argparse.ArgumentParser(description='Create the video.')
-
-    # KWARGs
-    params = default_args(parser, config.file.video)
+    params = default_args('Create the video.', config.file.video)
 
     # EXCEPTION
     for no_key in ['verbose', 'flush']: params.pop(no_key, None)
@@ -158,10 +160,7 @@ def volume() -> None:
     """
 
     print('\033[90mCreating the volume plot...\033[0m', flush=True)
-    parser = argparse.ArgumentParser(description='Create the volume plot.')
-
-    # KWARGs
-    params = default_args(parser, config.file.volume)
+    params = default_args('Create the volume plot.', config.file.volume)
 
     # RUN
     Volume(**params)

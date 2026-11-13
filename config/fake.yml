@@ -1,0 +1,18 @@
+# KEYWORD ARGUMENTs for the 'fake' command.
+sphere_radius:
+  - 7.0e+5
+  - 7.4e+5
+sphere_width: 1.0e+4
+stereo_radii:
+  - 0.6
+  - 0.8
+stereo_width: 0.05
+stereo_center:
+  - 0.7
+  - 0.5
+nb_cubes: 413
+
+# CONFIG
+processes: 12
+verbose: 1
+flush: true

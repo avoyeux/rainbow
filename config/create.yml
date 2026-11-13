@@ -1,4 +1,4 @@
-# KEYWORD ARGUMENTs for the hdf5 command.
+# KEYWORD ARGUMENTs for the 'create' command.
 filename: 'fake2.h5'
 integration_time: null
 polynomial_points: 1_000_000

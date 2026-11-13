@@ -9,3 +9,4 @@ from .project import SDOProject
 from .contour import Contour
 from .video import PngToVideo
 from .volume import Volume
+from .fake import Fake

@@ -87,7 +87,7 @@ dir:
 file:
     stereo_info: !join [*_stereo, 'stereo_304.save']
     timestamps: !join [*_input, 'SDO_timestamps.txt']
-    data: !join [*_hdf5, 'fake2.h5']
+    data: !join [*_hdf5, 'data.h5']
 
     # Commands
     _path: &_config !join [*root, 'config']
@@ -97,3 +97,4 @@ file:
     contour: !join [*_config, 'contour.yml']
     video: !join [*_config, 'video.yml']
     volume: !join [*_config, 'volume.yml']
+    fake: !join [*_config, 'fake.yml']

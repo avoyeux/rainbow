@@ -1,6 +1,6 @@
 """
-To create fake FITS files based on the original data to see if Dr. Auchere's new_toto.pro code
-works as intended.
+To create fake STEREO and SDO masks based on the original data to see visualize the no duplicates
+processing.
 """
 from __future__ import annotations
 
@@ -15,9 +15,6 @@ import PIL.Image
 import matplotlib.pyplot as plt
 from astropy.io import fits
 
-# IMPORTs personal
-from common import Decorators
-
 # IMPORTs local
 from rainbow.config import config
 
@@ -27,7 +24,7 @@ if TYPE_CHECKING:
     from rainbow.typing import CounterType
 
 # API public
-__all__ = ['CreateFakeTotoInputs']
+__all__ = ['TotoInputs']
 
 
 
@@ -52,36 +49,45 @@ class SdoHeaderInformation:
         ) / 1e3)
 
 
-class CreateFakeTotoInputs:
+class TotoInputs:
     """
     To create the fake data inputs (i.e. FITs + PNGs) for Dr. Auchere's new_toto.pro code.
     """
 
     def __init__(
             self,
-            sphere_radius: tuple[float, ...],
+            sphere_radius: tuple[float, ...] = (7e5, 7.2e5),
             sphere_width: float = 1e4,
             stereo_radii: tuple[float, ...] = (0.6, 0.8),
             stereo_width: float = 0.05,
             stereo_center: tuple[float, float] = (0.7, 0.5),
             nb_cubes: int = 413,
             processes: int = 1,
+            verbose: int = 0,
+            flush: bool = False,
         ) -> None:
         """
-        todo update docstring
         To create the fake data inputs for Dr. Auchere's new_toto.pro code.
 
         Args:
-            sphere_radius (float): the radius of the sphere in km.
+            sphere_radius (tuple[float, ...]): the radius of the sphere in km.
+                Defaults to (7e5, 7.2e5).
             sphere_width (float, optional): the radial width of the SDO circles in km.
                 Defaults to 1e4.
-            fake_len (int, optional): the number of fake data to create. Defaults to 413.
-            processes (int | None, optional): the number of processes to use. When None, it uses
-                the config file. Defaults to None.
+            stereo_radii (tuple[float, ...], optional): the radius of the SDO circles in km.
+                Defaults to (0.6, 0.8).
+            stereo_width (float, optional): the radial width of the SDO circles in km.
+                Defaults to 0.05.
+            stereo_center (tuple[float, float], optional): the center of the SDO circles in pixels.
+                Defaults to (0.7, 0.5).
+            nb_cubes (int): the number of fake data to create. Defaults to 413.
+            processes (int, optional): the number of processes to use. Defaults to 1.
         """
 
-        # PROCESSES setup
+        # CONFIG
         self._processes = processes
+        self._verbose = verbose
+        self._flush = flush
 
         # ATTRIBUTEs
         self._nb_cubes = nb_cubes
@@ -114,7 +120,6 @@ class CreateFakeTotoInputs:
         }
         return paths
 
-    @Decorators.running_time
     def _create_stereo_fake_data(self) -> None:
         """
         To create the fake data for the STEREO masks.
@@ -190,7 +195,6 @@ class CreateFakeTotoInputs:
         keep = (x >= 0) & (x < image.shape[1]) & (y >= 0) & (y < image.shape[0])
         image[y[keep], x[keep]] = 0
 
-    @Decorators.running_time
     def _create_sdo_fake_data(self) -> None:
         """
         To create the fake data for the SDO masks.
@@ -285,7 +289,8 @@ class CreateFakeTotoInputs:
             fileobj=os.path.join(self._paths['save sdo fits'], sdo_file_name),
             overwrite=True,
         )
-        print(f'SAVED - {sdo_file_name}', flush=True)
+        fake_hdul.close()
+        if self._verbose > 0: print(f'SAVED - {sdo_file_name}', flush=self._flush)
 
     def plot(self, filename: str, image: np.ndarray) -> None:
         """
@@ -332,7 +337,7 @@ class CreateFakeTotoInputs:
 
 if __name__=='__main__':
 
-    CreateFakeTotoInputs(
+    TotoInputs(
         processes=8,
         sphere_radius=(7e5, 7.2e5),
         sphere_width=1e4,

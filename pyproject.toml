@@ -98,6 +98,7 @@ create = "rainbow.cli:create"
 project = "rainbow.cli:project"
 contour = "rainbow.cli:contour"
 volume = "rainbow.cli:volume"
+fake = "rainbow.cli:fake"
 
 [build-system]
 requires = ["uv_build>=0.12.7,<0.13.0"]
