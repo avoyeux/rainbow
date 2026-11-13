@@ -21,7 +21,6 @@ __all__ = [
     'PolynomialData',
     'UniquePolynomialData',
     'CubeInfo',
-    'FakeCubeInfo',
     'UniqueCubeInfo',
 ]
 
@@ -194,58 +193,6 @@ class CubeInfo(ParentInfo):
 
 
 @dataclass(slots=True, repr=False, eq=False)
-class FakeCubeInfo(ParentInfo):
-    """
-    Stores the data and information related to the 'fake' data cubes.
-    """
-    
-    # DATA
-    time_indexes_fake: np.ndarray[tuple[int], np.dtype[np.int_]]
-    time_indexes_real: np.ndarray[tuple[int], np.dtype[np.int_]]
-
-    # PLACEHOLDERs
-    value_to_index: dict[int, int] = field(init=False)
-    polynomials: None = field(default=None, init=False)  # just to look like a CubeInfo
-
-    def __post_init__(self) -> None:
-
-        # PARENT post_init
-        super(FakeCubeInfo, self).__post_init__()
-        self.value_to_index = {
-            int(value): index
-            for index, value in enumerate(self.time_indexes_fake)
-        }
-
-    def __getitem__(self, index: int) -> list[np.ndarray]:
-        """
-        To get the corresponding cube from the fake data.
-
-        Args:
-            index (int): the index (from the real data) needed to be fetched.
-
-        Returns:
-            list[np.ndarray]: the corresponding fake cube inside a list.
-        """
-
-        # INDEX real to fake
-        time_index = int(self.time_indexes_real[index])
-        fake_index = self.value_to_index[time_index]
-
-        # FILTER
-        cube_filter = self.dataset_coords[0] == fake_index
-        cube_coords = self.dataset_coords[1:, cube_filter]
-        if self.dataset_values.shape == ():
-            values = self.dataset_values[...]
-        else:
-            values = self.dataset_values[cube_filter.ravel()]
-
-        # 3D array
-        cube = np.zeros(self.shape[1:], dtype='uint8')
-        cube[tuple(cube_coords)] = values
-        return [cube]
-
-
-@dataclass(slots=True, repr=False, eq=False)
 class UniqueCubeInfo(ParentInfo):
     """
     Stores the data and information related to the 'test' data cube.
@@ -308,7 +255,6 @@ class CubesData:
 
     # FAKE data
     sun_surface: CubeInfo | None = field(default=None, init=False)
-    fake_cube: FakeCubeInfo | None = field(default=None, init=False)
 
     # TEST data
     test_cube: UniqueCubeInfo | None = field(default=None, init=False)

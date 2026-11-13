@@ -55,8 +55,13 @@ dir:
         fake:
             _path: &_fake !join [*_output, 'fake']
 
-            png: !join [*_fake, 'png']
-            fits: !join [*_fake, 'fits']
+            stereo: !join [*_fake, 'stereo']
+
+            sdo:
+                _path: &_fake_sdo !join [*_fake, 'sdo']
+
+                fits: !join [*_fake_sdo, 'fits']
+                png: !join [*_fake_sdo, 'png']
 
         results:
             _path: &_results !join [*_output, 'results']
@@ -82,8 +87,7 @@ dir:
 file:
     stereo_info: !join [*_stereo, 'stereo_304.save']
     timestamps: !join [*_input, 'SDO_timestamps.txt']
-    data: !join [*_hdf5, 'data.h5']
-    fake: !join [*_fake, 'fake.h5']
+    data: !join [*_hdf5, 'fake.h5']
 
     # Commands
     _path: &_config !join [*root, 'config']

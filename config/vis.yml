@@ -5,12 +5,12 @@ polynomial_order:
 choices: 
   # - 'all dates'
   - 'sun'
-  # - 'all data'
+  - 'all data'
   # - 'all data integration'
-  # - 'no duplicate'
-  # - 'no duplicate integration'
+  - 'no duplicate'
+  - 'no duplicate integration'
   - 'line of sight sdo'
-  # - 'line of sight stereo'
+  - 'line of sight stereo'
   - 'pov sdo'
 
 # CONFIG

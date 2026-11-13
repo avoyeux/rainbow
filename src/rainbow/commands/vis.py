@@ -25,14 +25,15 @@ from common import Decorators, Plot
 # IMPORTs local
 from ..config import config
 from ..core.anim.animation_dataclasses import (
-    CubesData, CubesConstants, CubeInfo, FakeCubeInfo, UniqueCubeInfo,
+    CubesData, CubesConstants, CubeInfo, UniqueCubeInfo,
     PolynomialData, UniquePolynomialData,
 )
 
 # TYPE ANNOTATIONs
-from typing import Any, overload, Literal, cast
-type VoxelAlias = Any
-type JsLinkAlias = Any
+from typing import TYPE_CHECKING, Any, overload, Literal, cast
+if TYPE_CHECKING:
+    # IMPORTs local
+    from rainbow.typing import VoxelAlias, JsLinkAlias
 
 # API public
 __all__ = ['K3dAnimation']
@@ -77,7 +78,6 @@ class Setup:
             flush (int | None, optional): deciding to flush the buffer each time there is a print.
                 If None, it will use the config file. Defaults to None.
         """
-        print('here', flush=True)
 
         # CONSTANTs
         self._solar_r = 6.96e5
@@ -371,18 +371,6 @@ class Setup:
             interpolate: bool = ...,
             colour: str = ...,
             *,
-            cube_type: Literal['fake'],
-        ) -> FakeCubeInfo: ...
-
-    @overload
-    def get_cube_info(
-            self,
-            HDF5File: h5py.File,
-            group_path: str,
-            opacity: float = ...,
-            interpolate: bool = ...,
-            colour: str = ...,
-            *,
             cube_type: Literal['unique'],
         ) -> UniqueCubeInfo: ...
 
@@ -396,7 +384,7 @@ class Setup:
             colour: str = ...,
             opacity_polynomial: float = ...,
             cube_type: str = ...,
-        ) -> CubeInfo | FakeCubeInfo | UniqueCubeInfo: ...
+        ) -> CubeInfo | UniqueCubeInfo: ...
 
     def get_cube_info(
             self,
@@ -407,7 +395,7 @@ class Setup:
             colour: str = 'blue',
             opacity_polynomial: float = 1.,
             cube_type: str = 'real',
-        ) -> CubeInfo | FakeCubeInfo | UniqueCubeInfo:
+        ) -> CubeInfo | UniqueCubeInfo:
         """
         Gives the protuberance and polynomial fit information for a chosen cube 'type'.
 
@@ -425,7 +413,7 @@ class Setup:
             cube_type (str, optional): the type of cube to visualize. Defaults to 'real'.
 
         Returns:
-            CubeInfo | FakeCubeInfo | UniqueCubeInfo: the protuberance and polynomial fit
+            CubeInfo | UniqueCubeInfo: the protuberance and polynomial fit
                 information.
         """
 
@@ -488,19 +476,7 @@ class Setup:
                 polynomials=polynomials,
             )
         else:
-            cube_info = FakeCubeInfo(
-                group_path=group_path,
-                opacity=opacity,
-                opacity_polynomial=opacity_polynomial,
-                colour=colour,
-                xt_min_index=xt_min_index,
-                yt_min_index=yt_min_index,
-                zt_min_index=zt_min_index,
-                dataset_coords=data_coords,
-                dataset_values=data_values,
-                time_indexes_real=self.constants.time_indexes,
-                time_indexes_fake=cast(h5py.Dataset, HDF5File['Fake/Time indexes'])[...],
-            )
+            raise ValueError(f'cube_type {cube_type} is not implemented.')
         print(f'FETCHED -- {cube_info.name} data.')
         return cube_info
 
@@ -897,12 +873,6 @@ class K3dAnimation(Setup):
             # VOXELs create
             self.plot_los_stereo = self.create_voxels(self._cubes.los_stereo, **kwargs)
             for plot in self.plot_los_stereo: self.plot += plot
-        
-        # CUBE fake
-        if self._cubes.fake_cube is not None:
-            # VOXELs create
-            self.plot_fake_cube = self.create_voxels(self._cubes.fake_cube, **kwargs)
-            for plot in self.plot_fake_cube: self.plot += plot
 
         # BUTTON play/pause
         self.play_pause_button = ipywidgets.ToggleButton(
@@ -938,7 +908,7 @@ class K3dAnimation(Setup):
 
     def create_voxels(
             self,
-            cube: CubeInfo | FakeCubeInfo | UniqueCubeInfo,
+            cube: CubeInfo | UniqueCubeInfo,
             index: int = 0,
             **kwargs,
         ) -> list[VoxelAlias]:
@@ -947,7 +917,7 @@ class K3dAnimation(Setup):
         visualization.  
 
         Args:
-            cube (CubeInfo | FakeCubeInfo | UniqueCubeInfo): the cube information to visualize.
+            cube (CubeInfo | UniqueCubeInfo): the cube information to visualize.
             index (int, optional): the index of the time value to visualize. Defaults to 0.
 
         Returns:
@@ -1176,14 +1146,11 @@ class K3dAnimation(Setup):
         # STEREO LINE OF SIGHT
         if self._cubes.los_stereo is not None:
             self.update_voxel(self.plot_los_stereo, self._cubes.los_stereo, change['new'])
-        # FAKE CUBE
-        if self._cubes.fake_cube is not None:
-            self.update_voxel(self.plot_fake_cube, self._cubes.fake_cube, change['new'])
 
     def update_voxel(
             self,
             plots: list[VoxelAlias],
-            cube_info: CubeInfo | FakeCubeInfo,
+            cube_info: CubeInfo,
             index: int | None,
         ) -> None:
         """
@@ -1191,7 +1158,7 @@ class K3dAnimation(Setup):
 
         Args:
             plots (list[VoxelAlias]): the different voxel plots for each cube type.
-            cube_info (CubeInfo | FakeCubeInfo): the data cubes. None if it doesn't exist.
+            cube_info (CubeInfo): the data cubes. None if it doesn't exist.
             index (int | None): the data cube index. If None, then no data exists for data index.
         """
 
