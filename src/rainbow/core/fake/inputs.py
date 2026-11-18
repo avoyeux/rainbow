@@ -21,6 +21,10 @@ from rainbow.config import config
 # TYPE ANNOTATIONs
 from typing import Any, TYPE_CHECKING
 if TYPE_CHECKING:
+    # IMPORTs third-party
+    import numpy.typing as npt
+
+    # IMPORTs local
     from rainbow.typing import CounterType
 
 # API public
@@ -38,7 +42,7 @@ class SdoHeaderInformation:
     d_sun: float  # distance to sun in m
     resolution_arcsec: float  # pixel resolution in arcsec
     sun_center: tuple[float, float]  # the center of the sun in the image in pixels
-    
+
     # PLACEHOLDERs
     dx: float = field(init=False)
 
@@ -56,9 +60,9 @@ class TotoInputs:
 
     def __init__(
             self,
-            sphere_radius: tuple[float, ...] = (7e5, 7.2e5),
+            sphere_radius: tuple[float, float] = (7e5, 7.2e5),
             sphere_width: float = 1e4,
-            stereo_radii: tuple[float, ...] = (0.6, 0.8),
+            stereo_radii: tuple[float, float] = (0.6, 0.8),
             stereo_width: float = 0.05,
             stereo_center: tuple[float, float] = (0.7, 0.5),
             nb_cubes: int = 413,
@@ -70,11 +74,11 @@ class TotoInputs:
         To create the fake data inputs for Dr. Auchere's new_toto.pro code.
 
         Args:
-            sphere_radius (tuple[float, ...]): the radius of the sphere in km.
+            sphere_radius (tuple[float, float]): the radius of the sphere in km.
                 Defaults to (7e5, 7.2e5).
             sphere_width (float, optional): the radial width of the SDO circles in km.
                 Defaults to 1e4.
-            stereo_radii (tuple[float, ...], optional): the radius of the SDO circles in km.
+            stereo_radii (tuple[float, float], optional): the radius of the SDO circles in km.
                 Defaults to (0.6, 0.8).
             stereo_width (float, optional): the radial width of the SDO circles in km.
                 Defaults to 0.05.
@@ -128,13 +132,15 @@ class TotoInputs:
         with PIL.Image.open(os.path.join(self._paths['stereo files'], 'frame0000.png')) as real:
             width, height = real.size  # (W, H)
 
+        # MASK fake
+        image = self._arc_image(width=width, height=height)
+
         for index in range(self._nb_cubes):
-            image = self.arc_image(width=width, height=height)
             PIL.Image.fromarray(image).save(
                 os.path.join(self._paths['save stereo'], f'frame{index:04d}.png'),
             )
 
-    def arc_image(self, width: int, height: int) -> np.ndarray:
+    def _arc_image(self, width: int, height: int) -> npt.NDArray[np.uint8]:
         """
         To create an RGB mask image made of the fake circle arcs.
 
@@ -143,8 +149,8 @@ class TotoInputs:
             height (int): the height of the image in pixels.
 
         Returns:
-            np.ndarray: the (height, width, 3) uint8 mask image. The background (excluded) is
-                white and the arcs (kept) are black.
+            npt.NDArray[np.uint8]: the (height, width, 3) uint8 mask image. The background
+                (excluded) is white and the arcs (kept) are black.
         """
 
         # BACKGROUND excluded (white)
@@ -153,35 +159,46 @@ class TotoInputs:
         # ARCs kept (black)
         scale = min(width, height) / 2
         center = (width * self._stereo_center[0], height * self._stereo_center[1])
-        for radius in self._stereo_radii:
-            self.draw_arc(
+
+        # THETA range
+        theta_ranges = (
+            (np.pi / 2, np.pi * 1.1),
+            (np.pi * 0.9, np.pi * 3 / 2),
+        )  # overlapping arcs
+
+        # CREATE arcs
+        for theta, radius in zip(theta_ranges, self._stereo_radii):
+            self._draw_arc(
                 image=image,
                 center=center,
                 radius=radius * scale,
                 width=self._stereo_width * scale,
+                theta_range=theta,
             )
         return image
 
-    def draw_arc(
+    def _draw_arc(
             self,
-            image: np.ndarray,
+            image: npt.NDArray[np.uint8],
             center: tuple[float, float],
             radius: float,
             width: float,
+            theta_range: tuple[float, float],
         ) -> None:
         """
         To draw a half circle arc (kept pixels) on the mask image, with its apex pointing left.
 
         Args:
-            image (np.ndarray): the (height, width, 3) mask image to draw onto.
+            image (npt.NDArray[np.uint8]): the (height, width, 3) mask image to draw onto.
             center (tuple[float, float]): the (x, y) center of the arc in pixels.
             radius (float): the radius of the arc in pixels.
             width (float): the radial width of the arc in pixels.
+            theta_range (tuple[float, float]): the range of the theta angle in radians (start, end).
         """
 
         # COORDs half circle apex left
-        num_theta = max(4000, int(radius * np.pi * 4))
-        theta = np.linspace(np.pi / 2, 3 * np.pi / 2, num=num_theta)
+        num_theta = max(5000, int(radius * np.pi * 4))
+        theta = np.linspace(*theta_range, num=num_theta)
 
         # RADII with width
         offsets = np.arange(-width / 2, width / 2 + 0.5, 0.5)
@@ -210,7 +227,7 @@ class TotoInputs:
             processes: list[mp.Process] = [None] * processes_nb  #type:ignore
             for i in range(processes_nb):
                 p = mp.Process(
-                    target=self.sdo_fake_data_multiprocessing,
+                    target=self._sdo_fake_data_multiprocessing,
                     args=(counter,),
                 )
                 p.start()
@@ -218,9 +235,9 @@ class TotoInputs:
             for p in processes: p.join()
         else:
             # NO MULTIPROCESSING
-            for i in range(self._nb_cubes): self.create_sun_image_sdo(index=i)
+            for i in range(self._nb_cubes): self._create_sun_image_sdo(index=i)
 
-    def sdo_fake_data_multiprocessing(self, counter: CounterType[int]) -> None:
+    def _sdo_fake_data_multiprocessing(self, counter: CounterType[int]) -> None:
         """
         To create the fake data for the SDO masks in multiprocessing.
 
@@ -236,9 +253,9 @@ class TotoInputs:
                 if index >= self._nb_cubes: return
                 counter.value += 1
 
-            self.create_sun_image_sdo(index)
+            self._create_sun_image_sdo(index)
 
-    def create_sun_image_sdo(self, index: int) -> None:
+    def _create_sun_image_sdo(self, index: int) -> None:
         """
         To create the fake fits file image.
 
@@ -263,11 +280,22 @@ class TotoInputs:
         )
 
         # SUN IMAGE creation
-        image = np.zeros(hdu.data.shape, dtype=np.uint8)
+        image: npt.NDArray[np.uint8] = np.zeros(hdu.data.shape, dtype=np.uint8)
 
-        for radius in self._sphere_radius:
+        # THETA ranges
+        theta_ranges = np.deg2rad((
+            (160, 185),
+            (175, 200),
+        ))  # overlapping arcs
+
+        for theta, radius in zip(theta_ranges, self._sphere_radius):
             # COORDs sun
-            x, y = self.circle(radius, self._sphere_width, sdo_info.dx)
+            x, y = self._circle(
+                radius=radius,
+                width=self._sphere_width,
+                resolution=sdo_info.dx,
+                theta_range=theta,
+            )
 
             x_indexes = (x / sdo_info.dx) + sdo_info.sun_center[0]
             y_indexes = (y / sdo_info.dx) + sdo_info.sun_center[1]
@@ -281,7 +309,7 @@ class TotoInputs:
 
         # CHECK
         png_filename = sdo_file_name.replace('.fits.gz', '.png')
-        self.plot(filename=png_filename, image=image)
+        self._plot(filename=png_filename, image=image)
 
         # SAVE hdul
         fake_hdul[0].data = image
@@ -292,13 +320,17 @@ class TotoInputs:
         fake_hdul.close()
         if self._verbose > 0: print(f'SAVED - {sdo_file_name}', flush=self._flush)
 
-    def plot(self, filename: str, image: np.ndarray) -> None:
+    def _plot(
+            self,
+            filename: str,
+            image: npt.NDArray[np.uint8],
+        ) -> None:
         """
         To plot the sdo fits mask results for a visual check.
 
         Args:
             filename (str): the filename of the image to save.
-            image (np.ndarray): the image to plot.
+            image (npt.NDArray[np.uint8]): the image to plot.
         """
 
         plt.figure()
@@ -307,7 +339,13 @@ class TotoInputs:
         plt.savefig(os.path.join(self._paths['save sdo png'], filename), dpi=800)
         plt.close()
 
-    def circle(self, radius: float, width: float, resolution: float) -> np.ndarray:
+    def _circle(
+            self,
+            radius: float,
+            width: float,
+            resolution: float,
+            theta_range: tuple[float, float],
+        ) -> np.ndarray:
         """
         To create the cartesian coordinates of a circle outline.
 
@@ -315,14 +353,15 @@ class TotoInputs:
             radius (float): the radius of the circle in km.
             width (float): the radial width of the circle in km.
             resolution (float): the resolution of the SDO image in km.
+            theta_range (tuple[float, float]): the range of the angle in radians.
 
         Returns:
             np.ndarray: the cartesian coordinates of the circle.
         """
 
         # COORDs polar (only the circle outline, not the full disk)
-        num_theta = max(4000, int(2 * np.pi * radius / (resolution / 8)))
-        theta = np.linspace(0, 2 * np.pi, num=num_theta)
+        num_theta = max(5000, int(2 * np.pi * radius / (resolution / 8)))
+        theta = np.linspace(*theta_range, num=num_theta)
 
         # RADII with width
         offsets = np.arange(-width / 2, width / 2 + resolution / 8, resolution / 8)
