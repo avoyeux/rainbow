@@ -25,11 +25,10 @@ class Sun:
 
     def __init__(
             self,
-            radius: float,  # in km
-            dx: float,  # in km
+            radius: float,
+            dx: float,
             resolution: int,
-            verbose: int = 0,
-            flush: bool = False,
+            grid: float | None = 30.,
         ) -> None:
         """
         Creates the Sun's surface to use in the k3d animation.
@@ -43,21 +42,17 @@ class Sun:
             resolution -- int.
                 Number of points on the surface of the Sun in the theta direction.
                 (Double in the phi direction)
-            verbose -- int. Default = 0.
-                Verbosity level for the prints.
-            flush -- bool. Default = False.
-                Whether to flush the prints.
+            grid -- float | None. Default = 30.
+                Grid spacing in degrees. When None, no grid is added.
         """
 
-        # CONFIG
-        self._verbose = verbose
-        self._flush = flush
-
         # ARGs
+        self._grid = grid
         self._resolution = resolution
         self._radius_to_index = radius / dx
 
         # RUN
+        self._phi, self._theta = self._get_angles()
         self._positions = self._get_positions()
 
     def points(
@@ -81,13 +76,51 @@ class Sun:
 
         points = k3d.points(
             positions=self._positions,
-            point_size=0.7,
-            colors=[0xffff00] * len(self._positions),
+            point_size=2.5,
+            colors=self._get_colors(),
             shader=shader,
             name='SUN',
             compression_level=compression_lvl,
         )
         return points
+
+    def _get_angles(self) -> tuple[npt.NDArray[np.float32], npt.NDArray[np.float32]]:
+        """
+        Gives the angles of the points on the surface of the Sun.
+
+        Returns:
+            tuple[npt.NDArray[np.float32], npt.NDArray[np.float32]].
+                Angles of the points on the surface of the Sun.
+        """
+
+        # COORDs spherical
+        phi = np.linspace(0, np.pi, self._resolution, dtype=np.float32)
+        theta = np.linspace(0, 2 * np.pi, 2 * self._resolution, dtype=np.float32)
+        phi, theta = np.meshgrid(phi, theta)
+        return phi, theta
+
+    def _get_colors(self) -> list[int]:
+        """
+        Gives the colors of the points on the surface of the Sun.
+
+        Returns:
+            list[int].
+                Colors of the points on the surface of the Sun (in hexadecimal format).
+        """
+
+        # YELLOW
+        if self._grid is None: return [0xffff00] * self._positions.size
+
+        # GRID
+        spacing = np.deg2rad(self._grid)
+        tol_phi = np.deg2rad(180.0 / (self._resolution - 1)) / 2 * 1.01
+        tol_theta = np.deg2rad(360.0 / (2 * self._resolution - 1)) / 2 * 1.01
+
+        d_phi = np.abs(self._phi - np.round(self._phi / spacing) * spacing)
+        d_theta = np.abs(self._theta - np.round(self._theta / spacing) * spacing)
+
+        on_grid = (d_phi <= tol_phi) | (d_theta <= tol_theta)
+        return np.where(on_grid, 0x000000, 0xffffff).tolist()
 
     def _get_positions(self) -> npt.NDArray[np.float32]:
         """
@@ -98,15 +131,10 @@ class Sun:
                 Positions on the surface of the Sun in the k3d animation space.
         """
 
-        # COORDs spherical
-        phi = np.linspace(0, np.pi, self._resolution)
-        theta = np.linspace(0, 2 * np.pi, 2 * self._resolution)
-        phi, theta = np.meshgrid(phi, theta)
-
         # COORDs cartesian
-        x = self._radius_to_index * np.sin(phi) * np.cos(theta)
-        y = self._radius_to_index * np.sin(phi) * np.sin(theta)
-        z = self._radius_to_index * np.cos(phi)
+        x = self._radius_to_index * np.sin(self._phi) * np.cos(self._theta)
+        y = self._radius_to_index * np.sin(self._phi) * np.sin(self._theta)
+        z = self._radius_to_index * np.cos(self._phi)
 
         # SAVE coords
         positions = np.array([x.ravel(), y.ravel(), z.ravel()], dtype=np.float32).T

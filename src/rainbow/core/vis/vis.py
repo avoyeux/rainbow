@@ -605,7 +605,7 @@ class Setup:
                 name += f'({result.group(1)}th) '
             else:
                 raise ValueError(
-                    f"\033[1;31m The group path '{group_path}' pattern not recognised. \033[0m"
+                    f"\033[1;31m The group path '{group_path}' pattern not recognized. \033[0m"
                 )
 
         # GROUP check
@@ -759,8 +759,7 @@ class K3dAnimation(Setup):
                 radius=self._solar_r,
                 dx=self.constants.dx,
                 resolution=self.texture_resolution,
-                verbose=self._verbose - 1,
-                flush=self._flush,
+                grid=15.,
             )
             self.plot += sun.points(compression_lvl=self.compression_level)
 
