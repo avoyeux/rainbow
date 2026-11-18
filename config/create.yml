@@ -11,7 +11,6 @@ full: false
 no_feet: True
 
 # CONFIG
-compression: true
 compression_lvl: 9
 processes: 32
 verbose: 10

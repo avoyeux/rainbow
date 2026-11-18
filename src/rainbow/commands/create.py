@@ -37,7 +37,6 @@ from ..core.data.base_hdf5_creator import VolumeInfo, BaseHDF5Protuberance
 # TYPE ANNOTATIONs
 from typing import Any, Callable, cast, TYPE_CHECKING
 if TYPE_CHECKING:
-
     # IMPORTs third-party
     import numpy.typing as npt
     from sitools2.clients.sdo_data import SdoData
@@ -48,7 +47,6 @@ if TYPE_CHECKING:
 # API public
 __all__ = ['Create']
 
-# todo change the code so each cube processing is done in a separate process
 # todo descriptions change as dates changed and (e.g. raw data) most cube indexes contain no data
 # todo find a solution for SDO positions (probably fitting after opening the data or something).
 
@@ -79,53 +77,59 @@ class Create(BaseHDF5Protuberance):
             leg_threshold: float = 0.03,
             full: bool = False,
             no_feet: bool = False,
-            compression: bool = True,
-            compression_lvl: int = 9,
+            compression_lvl: int | None = 9,
             processes: int = 1,
             verbose: int = 0,
             flush: bool = False,
         ) -> None:
         """
-        todo update docstring
         To create the cubes with and/or without feet in an HDF5 file.
 
         Args:
-            filename (str | None, optional): the filename of the file to be saved. When None, gets
-                the value from the config file. Defaults to None.
-            processes (int | None, optional): the number of processes used in the multiprocessing.
-                When None, gets the value from the config file. Defaults to None.
-            integration_time (list[int] | None, optional): the time(s) in hours used in the time
-                integration of the data. When None, no time integration is done.
-                Defaults to [24].
-            polynomial_points (int, optional): the number of points used when recreating the
-                polynomial gotten from the curve fitting of the data. Defaults to int(1e6).
-            polynomial_order (list[int], optional): the order(s) used for the polynomial fit of the
-                data. Defaults to [3, 4, 5].
-            feet_lon_lat (tuple[tuple[int | float, int | float], ...], optional): the positions of
-                the feet in re-projected Heliographic Carrington coordinates.
-                Defaults to ((-177, 14.5), (-163.5, -16.5)).
-            feet_sigma (int | float, optional): the sigma uncertainty in the feet used during the
-                curve fitting of the data points. Defaults to 1e-4.
-            south_leg_sigma (int | float, optional): the sigma uncertainty in the south leg used
-                during the curve fitting of the data points. Defaults to 5.
-            leg_threshold (float, optional): the threshold used to filter the data in the feet
-                curve fitting. Defaults to 0.03.
-            full (bool, optional): deciding to save all the data. In the case when 'full' is True,
-                the raw coordinates of the polynomial curve are also saved, where as only the
-                indexes that can be directly used as coords in a sparse.COO object.
-                Defaults to False.
-            no_feet (bool, optional): deciding to not add the feet to the data. Defaults to False.
-            compression (bool, optional): deciding to use 'gzip' compression in the HDF5 file.
-                Defaults to True.
-            compression_lvl (int, optional): the level of compression used in the HDF5 file.
-                Defaults to 9.
+            filename -- str. Default = 'data.h5'.
+                The filename of the file to be saved.
+            integration_time -- list[int]. Default = [24].
+                The time(s) in hours used in the time integration of the data. When set to [],
+                no time integration is done.
+            polynomial_points -- int. Default = int(1e6).
+                The number of points used when recreating the polynomial gotten from the curve
+                fitting of the data.
+            polynomial_order -- list[int]. Default = [3, 4, 5].
+                The order(s) used for the polynomial fit of the data. When set to [], no polynomial
+                fit is done.
+            feet_lon_lat -- tuple[tuple[float, float], tuple[float, float]]. Default = (
+                (-177, 14.5),
+                (-163.5, -16.5),
+            )
+                The positions of the feet in re-projected Heliographic Carrington coordinates.
+            feet_sigma -- float. Default = 1e-4.
+                The sigma uncertainty in the feet used during the curve fitting of the data points.
+            south_leg_sigma -- float. Default = 5.
+                The sigma uncertainty in the south leg used during the curve fitting of the data
+                points.
+            leg_threshold -- float. Default = 0.03.
+                The threshold used to filter the data in the feet curve fitting.
+            full -- bool. Default = False.
+                Whether to save all the data. In the case when 'full' is True, the raw coordinates
+                of the polynomial curve are also saved, where as only the indexes that can be
+                directly used as coords in a sparse.COO object.
+            no_feet -- bool. Default = False.
+                Whether to not add the feet to the data. Defaults to False.
+            compression_lvl -- int | None. Default = 9.
+                The level of compression used in the HDF5 file. If None, no compression is done.
+            processes -- int. Default = 1.
+                The number of processes used in the multiprocessing.
+            verbose -- int. Default = 0.
+                The verbosity level for the prints.
+            flush -- bool. Default = False.
+                Whether to flush the prints. 
         """
 
         # MULTIPROCESSING setup
         self.processes = processes
 
         # PARENT
-        super().__init__(filename, compression, compression_lvl)
+        super().__init__(filename, compression_lvl)
 
         # CONSTANTs
         self._sdo_metadata: list[SdoData] = AllSDOMetadata().sdo_metadata
@@ -1175,7 +1179,7 @@ class Create(BaseHDF5Protuberance):
             f'/Time integration of {int(time / 3600)} hours'
             for time in self._integration_time
         ] + ['/Full integration']
-        
+
         # INTEGRATED data
         main_path_2 = 'Time integrated/'
         for main_option in data_options:
@@ -1226,7 +1230,7 @@ class Create(BaseHDF5Protuberance):
         while not output_queue.empty():
             identifier, result = output_queue.get()
             rawCubes_list[identifier] = result
-        
+
         # FILL NoneTypes
         rawCubes_list = [
             sparse.COO(
@@ -1566,6 +1570,5 @@ if __name__=='__main__':
         leg_threshold=0.03,
         full=False,
         no_feet=True,
-        compression=True,
         compression_lvl=9,
     )

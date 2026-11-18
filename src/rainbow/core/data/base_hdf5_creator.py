@@ -41,21 +41,21 @@ class BaseHdf5Creator:
     To store base methods for creating HDF5 files.
     """
 
-    def __init__(self, filename: str, compression: bool = False, compression_lvl: int = 9) -> None:
+    def __init__(self, filename: str, compression_lvl: int | None = 9) -> None:
         """
         To type initialise the instance attributes usd in these default hdf5 creator methods and
         the constant instant attributes.
 
         Args:
-            filename (str): the filename of the HDF5 file to create.
-            compression (bool, optional): deciding to compress the datasets using gzip.
-                Defaults to False.
-            compression_lvl (int, optional): the gzip compression level. Defaults to 9.
+            filename -- str.
+                The filename of the HDF5 file to create.
+            compression_lvl -- int | None. Default = 9.
+                The gzip compression level.
         """
 
         # PLACEHOLDERs
         self.filename = filename
-        self.compression = 'gzip' if compression else None
+        self.compression = 'gzip' if compression_lvl else None
         self.compression_lvl = compression_lvl
 
         # ATTRIBUTEs
@@ -135,7 +135,6 @@ class BaseHdf5Creator:
 
         # CHECKs
         if len(info) == 0: return
-        if compression is None: compression_lvl = None
 
         # DATASET key for ndarray
         stopped = False
@@ -161,7 +160,7 @@ class BaseHdf5Creator:
 
             # CHECK nbytes
             if data.nbytes < self.compression_min_size: compression, compression_lvl = None, None
-            
+
             dataset = parent_group.create_dataset(
                 name,
                 data=info[key],
@@ -201,19 +200,19 @@ class BaseHDF5Protuberance(BaseHdf5Creator):
     To store base methods to create an HDF5 file using the rainbow protuberance data.
     """
 
-    def __init__(self, filename: str, compression: bool = False, compression_lvl: int = 9) -> None:
+    def __init__(self, filename: str, compression_lvl: int | None = 9) -> None:
         """
         To initialise the instance attributes used when creating a default protuberance HDF5 file.
 
         Args:
-            filename (str): the filename of the HDF5 file to create.
-            compression (bool, optional): deciding to compress the datasets using gzip.
-                Defaults to False.
-            compression_lvl (int, optional): the gzip compression level. Defaults to 9.
+            filename -- str.
+                The filename of the HDF5 file to create.
+            compression_lvl -- int | None. Default = 9.
+                The gzip compression level.
         """
         
         # PARENT
-        super().__init__(filename, compression, compression_lvl)
+        super().__init__(filename, compression_lvl)
 
         # CONSTANTs
         self.solar_r = 6.96e5  # in km
@@ -349,7 +348,7 @@ class BaseHDF5Protuberance(BaseHdf5Creator):
         coords = np.round(coords).astype(int)
         if unique: coords = np.unique(coords, axis=1)
         return coords, new_borders     
-    
+
     def dx_to_dict(self) -> dict[str, str | float]:
         """
         Returns the voxel resolution in a dictionary.
