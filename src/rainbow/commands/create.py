@@ -126,7 +126,7 @@ class Create(BaseHDF5Protuberance):
         """
 
         # MULTIPROCESSING setup
-        self.processes = processes
+        self._processes = processes
 
         # PARENT
         super().__init__(filename, compression_lvl)
@@ -134,7 +134,7 @@ class Create(BaseHDF5Protuberance):
         # CONSTANTs
         self._sdo_metadata: list[SdoData] = AllSDOMetadata().sdo_metadata
         self._max_len: int = len(self._sdo_metadata)
-        self._nb_processes: int = min(self.processes, self._max_len)
+        self._nb_processes: int = min(self._processes, self._max_len)
         self._feet_options: list[str] = ['', ' with feet'] if not no_feet else ['']
         self._first_datetime: datetime = self._sdo_metadata[0].date_obs #type:ignore
 
@@ -228,8 +228,8 @@ class Create(BaseHDF5Protuberance):
             for filepath in filepaths
             if (matched := self._cube_pattern.match(os.path.basename(filepath))) is not None
         ]
-        self.numbers = sorted(cube_numbers)
-        self._cube_numbers = self._cube_numbers_to_cube_index(self.numbers)
+        self._numbers = sorted(cube_numbers)
+        self._cube_numbers = self._cube_numbers_to_cube_index(self._numbers)
 
         # DATEs in seconds
         self._dates_seconds = [
@@ -408,7 +408,7 @@ class Create(BaseHDF5Protuberance):
 
             # BORDERs
             cube = scipy.io.readsav(
-                os.path.join(self._paths['cubes'], f"cube{self.numbers[0]:03d}.save"),
+                os.path.join(self._paths['cubes'], f"cube{self._numbers[0]:03d}.save"),
             )
             self.volume = VolumeInfo(
                 dx=float(cube.dx),
@@ -1201,7 +1201,7 @@ class Create(BaseHDF5Protuberance):
 
         # SETUP multiprocessing
         cube_nb = len(self._cube_numbers)
-        processes_nb = min(self.processes, cube_nb)
+        processes_nb = min(self._processes, cube_nb)
         manager = mp.Manager()
         input_queue = manager.Queue()
         output_queue = manager.Queue()
@@ -1210,7 +1210,7 @@ class Create(BaseHDF5Protuberance):
         for number, identifier in enumerate(self._cube_numbers):
             input_queue.put((
                 identifier,
-                os.path.join(self._paths['cubes'], f'cube{self.numbers[number]:03d}.save'),
+                os.path.join(self._paths['cubes'], f'cube{self._numbers[number]:03d}.save'),
             ))
         for _ in range(processes_nb): input_queue.put(None)
 
@@ -1236,7 +1236,7 @@ class Create(BaseHDF5Protuberance):
             sparse.COO(
                 coords=[],
                 data=[],
-                shape=rawCubes_list[self.cube_numbers[0]].shape,
+                shape=rawCubes_list[self._cube_numbers[0]].shape,
             ).astype('uint8')
             if cube is None else cube  
             for cube in rawCubes_list
@@ -1376,7 +1376,7 @@ class Create(BaseHDF5Protuberance):
             'feet_sigma': self._feet_sigma,
             'south_sigma': self._south_leg_sigma,
             'leg_threshold': self._leg_threshold,
-            'processes': self.processes,  # ? why not nb_processes and processes ???
+            'processes': self._processes,  # ? why not nb_processes and processes ???
             'precision_nb': self._polynomial_points,
             'full': self._full,
             'verbose': self._verbose,
