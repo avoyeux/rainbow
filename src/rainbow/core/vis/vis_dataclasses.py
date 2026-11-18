@@ -267,5 +267,4 @@ class CubesData:
         """
         To close the hdf5 file.
         """
-
         self.hdf5File.close()

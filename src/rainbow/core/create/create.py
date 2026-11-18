@@ -1,0 +1,1573 @@
+"""
+To create the HDF5 data files with the cubes data and metadata.
+A lot of different data is saved in the file to make any further manipulation or visualization more
+easy.
+"""
+from __future__ import annotations
+
+# IMPORTs standard
+import os
+import re
+import glob
+import multiprocessing as mp
+from datetime import datetime
+
+# IMPORTs third-party
+import h5py
+import scipy
+import sunpy
+import sparse
+import astropy
+import numpy as np
+import sunpy.coordinates
+from astropy import units as u
+
+# IMPORTs personal
+from common import Decorators, CustomDate
+
+# IMPORTs local
+from rainbow.config import config
+from rainbow.core.miscellaneous.shared_memory import Shared
+from rainbow.core.data.helpers.all_sdo_dates import AllSDOMetadata
+from rainbow.core.data.polynomial_fit.base_polynomial_fit import Polynomial
+from rainbow.core.data.base_hdf5_creator import VolumeInfo, BaseHDF5Protuberance
+
+# TYPE ANNOTATIONs
+from typing import Any, Callable, cast, TYPE_CHECKING
+if TYPE_CHECKING:
+    # IMPORTs third-party
+    import numpy.typing as npt
+    from sitools2.clients.sdo_data import SdoData
+
+    # IMPORTs local
+    from rainbow.typing import QueueType
+
+# API public
+__all__ = ['Create']
+
+# todo descriptions change as dates changed and (e.g. raw data) most cube indexes contain no data
+# todo find a solution for SDO positions (probably fitting after opening the data or something).
+
+
+
+class Create(BaseHDF5Protuberance):
+    """
+    To create cubes with and/or without feet in an HDF5 file.
+    """
+
+    # CONSTANTs
+    _weird_stereo_datetime0: datetime = datetime(2012, 7, 24, 20, 6, 44)
+    _weird_stereo_datetime1: datetime = datetime(2012, 7, 24, 20, 16, 44)
+
+    @Decorators.running_time
+    def __init__(
+            self,
+            filename: str  = 'data.h5',
+            integration_time: list[int] = [24],
+            polynomial_points: int = int(1e6),
+            polynomial_order: list[int] = [3, 4, 5],
+            feet_lon_lat: tuple[tuple[float, float], tuple[float, float]] = (
+                (-177, 14.5),
+                (-163.5, -16.5),
+            ),
+            feet_sigma: float = 1e-4,
+            south_leg_sigma: float = 5,
+            leg_threshold: float = 0.03,
+            full: bool = False,
+            no_feet: bool = False,
+            compression_lvl: int | None = 9,
+            processes: int = 1,
+            verbose: int = 0,
+            flush: bool = False,
+        ) -> None:
+        """
+        To create the cubes with and/or without feet in an HDF5 file.
+
+        Args:
+            filename -- str. Default = 'data.h5'.
+                The filename of the file to be saved.
+            integration_time -- list[int]. Default = [24].
+                The time(s) in hours used in the time integration of the data. When set to [],
+                no time integration is done.
+            polynomial_points -- int. Default = int(1e6).
+                The number of points used when recreating the polynomial gotten from the curve
+                fitting of the data.
+            polynomial_order -- list[int]. Default = [3, 4, 5].
+                The order(s) used for the polynomial fit of the data. When set to [], no polynomial
+                fit is done.
+            feet_lon_lat -- tuple[tuple[float, float], tuple[float, float]]. Default = (
+                (-177, 14.5),
+                (-163.5, -16.5),
+            )
+                The positions of the feet in re-projected Heliographic Carrington coordinates.
+            feet_sigma -- float. Default = 1e-4.
+                The sigma uncertainty in the feet used during the curve fitting of the data points.
+            south_leg_sigma -- float. Default = 5.
+                The sigma uncertainty in the south leg used during the curve fitting of the data
+                points.
+            leg_threshold -- float. Default = 0.03.
+                The threshold used to filter the data in the feet curve fitting.
+            full -- bool. Default = False.
+                Whether to save all the data. In the case when 'full' is True, the raw coordinates
+                of the polynomial curve are also saved, where as only the indexes that can be
+                directly used as coords in a sparse.COO object.
+            no_feet -- bool. Default = False.
+                Whether to not add the feet to the data. Defaults to False.
+            compression_lvl -- int | None. Default = 9.
+                The level of compression used in the HDF5 file. If None, no compression is done.
+            processes -- int. Default = 1.
+                The number of processes used in the multiprocessing.
+            verbose -- int. Default = 0.
+                The verbosity level for the prints.
+            flush -- bool. Default = False.
+                Whether to flush the prints. 
+        """
+
+        # MULTIPROCESSING setup
+        self._processes = processes
+
+        # PARENT
+        super().__init__(filename, compression_lvl)
+
+        # CONSTANTs
+        self._sdo_metadata: list[SdoData] = AllSDOMetadata().sdo_metadata
+        self._max_len: int = len(self._sdo_metadata)
+        self._nb_processes: int = min(self._processes, self._max_len)
+        self._feet_options: list[str] = ['', ' with feet'] if not no_feet else ['']
+        self._first_datetime: datetime = self._sdo_metadata[0].date_obs #type:ignore
+
+        # ARGUMENTs
+        self._integration_time = [time * 3600 for time in integration_time]
+        self._polynomial_order = polynomial_order
+        self._polynomial_points = polynomial_points
+        self._feet_sigma = feet_sigma
+        self._south_leg_sigma = south_leg_sigma
+        self._leg_threshold = leg_threshold
+        self._full = full  # deciding to add the heavy sky coords arrays.
+        self._no_feet = no_feet
+        self._verbose = verbose
+        self._flush = flush
+
+        # PLACEHOLDERs
+        self._dx: dict[str, str | float]  # information and value of the spatial resolution
+        self._paths: dict[str, str]  # the paths to the different directories
+        self._cube_numbers: list[int] # the cube numbers
+        self._dates_seconds: list[int]  # the dates in seconds
+        self._feet: astropy.coordinates.SkyCoord  # the feet positions
+        self._cube_pattern: re.Pattern[str]  # the pattern for the .save cubes
+        self._date_pattern: re.Pattern[str]  # the pattern for the STEREO B 30.4nm dates
+
+        # SETUP attributes
+        self._setup_attributes(feet_lon_lat)
+
+        # RUN
+        self._create()
+
+    def _setup_path(self) -> dict[str, str]:
+        """
+        Gives the directory and file paths as a dictionary.
+
+        Returns:
+            dict[str, str].
+                The directory and file paths.
+        """
+
+        # PATHs
+        paths = {
+            'cubes': config.dir.input.cubes,
+            'intensities': config.dir.input.stereo.wave304.int,
+            'stereo info': config.file.stereo_info,
+            'save': config.dir.output.hdf5,
+        }
+        return paths
+
+    def _setup_patterns(self) -> tuple[re.Pattern[str], re.Pattern[str]]:
+        """
+        The regular expression patterns used.
+
+        Returns:
+            tuple[re.Pattern[str], re.Pattern[str]]: the regular expression patterns for the .save
+                cubes and the intensities STEREO B 30.4nm.
+        """
+
+        # PATTERNs
+        cube_pattern = re.compile(r'cube(\d{3})\.save')
+        date_pattern = re.compile(
+            r'(?P<number>\d{4})_(?P<date>\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2})\.\d{3}\.png'
+        )
+        return cube_pattern, date_pattern
+
+    def _setup_attributes(
+            self,
+            feet_lon_lat: tuple[tuple[float, float], tuple[float, float]],
+        ) -> None:
+        """
+        Multiple instance attributes are defined here. Function is only here to not flood the
+        __init__ method.
+
+        Args:
+            feet_lon_lat (tuple[tuple[float, float], tuple[float, float]]):
+                the longitude and latitude positions for the added feet
+                (i.e. ((lon1, lat1), (lon2, lat2))).
+        """
+
+        # FEET and PATTERNs
+        self._feet = self._setup_feet(feet_lon_lat)
+        self._cube_pattern, self._date_pattern = self._setup_patterns()
+
+        # PATHs create
+        self._paths = self._setup_path()
+
+        # FILEPATHs cubes
+        filepaths = glob.glob(os.path.join(self._paths['cubes'], 'cube*.save'))
+
+        # NUMBERs cubes
+        cube_numbers = [  # * keep this as it is used for the raw data
+            int(matched.group(1))
+            for filepath in filepaths
+            if (matched := self._cube_pattern.match(os.path.basename(filepath))) is not None
+        ]
+        self._numbers = sorted(cube_numbers)
+        self._cube_numbers = self._cube_numbers_to_cube_index(self._numbers)
+
+        # DATEs in seconds
+        self._dates_seconds = [
+            self._datetime_to_seconds(date=cast(datetime, metadata.date_obs))
+            for metadata in self._sdo_metadata
+        ]
+
+    def _datetime_to_seconds(self, date: datetime) -> int:
+        """
+        To convert a datetime object to seconds since the first datetime.
+
+        Args:
+            date (datetime): the datetime object to convert.
+
+        Returns:
+            int: the number of seconds since the first datetime.
+        """
+        return round((date - self._first_datetime).total_seconds())
+
+    def _cube_numbers_to_cube_index(self, cube_indexes: list[int]) -> list[int]:
+        """
+        To convert the cube numbers to the new cube indexes (given the cadence of 1 minute).
+
+        Args:
+            cube_indexes (list[int]): the initial cube indexes.
+
+        Returns:
+            list[int]: the new cube indexes given the cadence of 1 minute.
+        """
+
+        stereo_filepaths = sorted(glob.glob(os.path.join(self._paths['intensities'], '*.png')))
+
+        # INDEX to date
+        cube_to_date = {
+            int(matched.group('number')): self._stereo_to_sdo_date_conversion(matched)
+            for filepath in stereo_filepaths
+            if (matched := self._date_pattern.match(os.path.basename(filepath))) is not None
+        }
+
+        # DATEs of initial cubes
+        cube_dates = [cube_to_date[index] for index in cube_indexes]
+
+        # DATEs to new indexes
+        date_to_index: dict[datetime, int] = {
+            cast(datetime, meta.date_obs): index
+            for index, meta in enumerate(self._sdo_metadata)
+        }
+
+        # INDEXEs new
+        cube_indexes = [date_to_index[date] for date in cube_dates]
+        return cube_indexes
+
+    def _stereo_to_sdo_date_conversion(self, matched: re.Match[str]) -> datetime:
+        """
+        To convert the STEREO B 30.4nm date to a corresponding SDO datetime object.
+        If statements are needed as not all dates are exactly the same when comparing with SDO.
+
+        Args:
+            matched (re.Match[str]): the matched object from the filename of the STEREO
+                acquisitions.
+
+        Returns:
+            datetime: the datetime object corresponding to an SDO date.
+        """
+
+        # DATETIME
+        date = datetime.strptime(matched.group('date'), '%Y-%m-%dT%H-%M-%S')
+
+        # CONVERSION (with some weird cases)
+        if date.second == 13:
+            date = date.replace(second=19)
+        elif date == self._weird_stereo_datetime0:
+            date = datetime(2012, 7, 24, 20, 7, 19)
+        elif date == self._weird_stereo_datetime1:
+            date = datetime(2012, 7, 24, 20, 20, 31)
+        elif date.second == 44:
+            date = date.replace(second=43)
+
+        # DATE converted
+        return date
+
+    def _setup_feet(
+            self,
+            lon_lat: tuple[tuple[int | float, int | float], ...],
+        ) -> astropy.coordinates.SkyCoord:
+        """
+        Gives the 2 feet positions as an astropy.coordinates.SkyCoord object in Carrington
+        Heliographic Coordinates. 
+
+        Args:
+            lon_lat (tuple[tuple[int | float, int | float], ...]): the longitude and latitude
+                positions for the added feet (i.e. ((lon1, lat1), (lon2, lat2))).
+
+        Returns:
+            coordinates.SkyCoord: the SkyCoord for the feet.
+        """
+
+        # FEET setup
+        feet_pos = np.empty((3, 2), dtype='float64')
+        feet_pos[0, :] = np.array([lon_lat[0][0], lon_lat[1][0]])
+        feet_pos[1, :] = np.array([lon_lat[0][1], lon_lat[1][1]])
+        feet_pos[2, :] = self.solar_r
+
+        # FEET create
+        feet = astropy.coordinates.SkyCoord(
+            feet_pos[0, :] * u.deg,
+            feet_pos[1, :] * u.deg,
+            feet_pos[2, :] * u.km,
+            frame=sunpy.coordinates.frames.HeliographicCarrington,
+        )
+        cartesian_feet = feet.represent_as(astropy.coordinates.CartesianRepresentation)
+        feet = astropy.coordinates.SkyCoord(
+            cartesian_feet,
+            frame=feet.frame,
+            representation_type='cartesian',
+        )
+        return feet
+
+    def _get_cube_dates_info(self) -> dict[str, dict[str, str | np.ndarray]]:
+        """
+        Gives the cube numbers and dates information. 
+
+        Returns:
+            dict[str, dict[str, str | np.ndarray]]: the data and metadata for the cube numbers and
+                dates.
+        """
+
+        # METADATA
+        cube_numbers_info = {
+            'data': np.array(self._cube_numbers).astype('uint16'),
+            'unit': 'none',
+            'description': (
+                "The cubes time indexes (i.e. the first row of the data) where there is volumetric"
+                " data. This is only true for the raw data and the filtered one (not for the "
+                "integrated data)." 
+            ),
+        }
+        cube_dates_info = {
+            'data': np.array([
+                cast(datetime, meta.date_obs).strftime("%Y-%m-%dT%H-%M-%S")
+                for meta in self._sdo_metadata
+            ]).astype('S19'),
+            'unit': 'none',
+            'description': (
+                "The dates of the STEREO B 30.4nm acquisitions. These represent all the possible "
+                "dates and are indexed in the same way than the data cubes."
+            ),
+        }
+        ias_path_info = {  
+            'data': np.array([
+                cast(str, meta.ias_location)
+                for meta in self._sdo_metadata
+            ]).astype('S40'),
+            'unit': 'none',
+            'description': (
+                "The IAS server paths to the SDO FITS files corresponding to the dates given in "
+                "the 'Dates' dataset."
+            ),
+        }
+
+        # SAVE reformat
+        information = {
+            'Time indexes': cube_numbers_info,
+            'Dates': cube_dates_info,
+            'IAS paths': ias_path_info,
+        }
+        return information
+
+    @Decorators.running_time
+    def _create(self) -> None:
+        """
+        Main function that encapsulates the file creation and closing with a with statement.
+        """
+
+        with h5py.File(os.path.join(self._paths['save'], self.filename), 'w') as H5PYFile:
+
+            # BORDERs
+            cube = scipy.io.readsav(
+                os.path.join(self._paths['cubes'], f"cube{self._numbers[0]:03d}.save"),
+            )
+            self.volume = VolumeInfo(
+                dx=float(cube.dx),
+                xt_min=float(cube.xt_min),
+                yt_min=float(cube.yt_min),
+                zt_min=float(cube.zt_min),
+            )
+            self._dx = self.dx_to_dict()
+            values = (cube.xt_min, cube.yt_min, cube.zt_min)
+            init_borders = self.create_borders(values)
+
+            # METADATA global
+            self._foundation(H5PYFile)
+
+            # DATA raw
+            self._raw_group(H5PYFile, init_borders)
+
+            # DATA filtered
+            self._filtered_group(H5PYFile, init_borders)
+
+            # DATA integrated
+            self._integrated_group(H5PYFile, init_borders)
+
+            # DATA polynomial
+            if self._polynomial_order: self._polynomial_group(H5PYFile)
+
+    def _foundation(self, H5PYFile: h5py.File) -> None:
+        """
+        For the main file metadata before getting to the HDF5 datasets and groups.
+
+        Args:
+            H5PYFile (h5py.File): the HDF5 file.
+        """
+
+        description = (
+            "Contains the data cubes for the Solar Rainbow event gotten from the intersection of "
+            "masks gotten from SDO and STEREO images.The SDO masks were created from an automatic "
+            "code created by Dr. Elie Soubrie, while the STEREO masks where manually created by "
+            "Dr. Karine Bocchialini by visual interpretation of the 30.4nm STEREO B acquisitions."
+            "\nNew values for the feet where added to help for a curve fitting of the filament. "
+            "These were added by looking at the STEREO B 30.4nm images as the ends of the "
+            "filament are more visible. Hence, the feet are not actually visible in the initial "
+            "masks.\nExplanation on what each HDF5 group or dataset represent is given in the "
+            "corresponding 'description' attribute."
+        )
+        metadata = self.main_metadata()
+        metadata['description'] += description
+
+        # METADATA
+        meta_info = self._get_cube_dates_info()
+        sdo_info = self._get_pos_sdo_info()
+        # stereo_info = self.get_pos_stereo_info()
+
+        # RUN information
+        run_info = self._get_run_information()
+
+        # UPDATE file
+        self.add_dataset(H5PYFile, metadata)
+        self.add_dataset(H5PYFile, self._dx, 'dx')
+        for key in meta_info.keys(): self.add_dataset(H5PYFile, meta_info[key], key)
+        self.add_dataset(H5PYFile, sdo_info, 'SDO positions')
+        # self.add_dataset(H5PYFile, stereo_info, 'STEREO B positions')
+        self.add_group(H5PYFile, run_info, 'Specific information')
+
+    def _get_run_information(self) -> dict[str, dict[str, str | int | float]]:
+        """
+        Gives information on the thresholds and weights used for the data creation.
+
+        Returns:
+            dict[str, dict[str, str | int | float]]: the data and metadata for the run information.
+        """
+
+        # RUN information
+        feet_sigma = {
+            'value': self._feet_sigma,
+            'unit': 'none',
+            'description': (
+                "The sigma uncertainty in the feet used during the curve fitting of the data "
+                "points. The lower the value, the higher the weight given to the feet positions."
+            ),
+        }
+        leg_threshold = {
+            'value': self._leg_threshold,
+            'unit': 'none',
+            'description': (
+                "The threshold used to filter the data in the feet curve fitting. The lower the "
+                "value, the less data is considered to be part of the 'left' leg. Information "
+                "used with the leg sigma (as a the weight for the leg can be different than for "
+                "the two unique voxel representing the feet)."
+            ),
+        }
+        leg_sigma = {
+            'value': self._south_leg_sigma,
+            'unit': 'none',
+            'description': (
+                "The sigma uncertainty in the south leg used during the curve fitting of the data "
+                "points. The lower the value, the higher the weight given to the south leg."
+            ),
+        }
+
+        # INFORMATION formatting
+        information = {
+            'Feet sigma': feet_sigma,
+            'Leg threshold': leg_threshold,
+            'Leg sigma': leg_sigma,
+        }
+        return information
+
+    @Decorators.running_time
+    def _get_pos_sdo_info(self) -> dict[str, str | np.ndarray]:
+        """
+        Gives the SDO satellite position information in Cartesian Heliocentric Coordinates.
+
+        Returns:
+            dict[str, str | np.ndarray]: the data and metadata for the SDO satellite position
+        """
+
+        # COORDs
+        coordinates = self._get_pos_code(
+            data=[metadata.ias_location for metadata in self._sdo_metadata], 
+            function=self._get_pos_sdo_sub,
+        )
+
+        # DATA formatting
+        information = {
+            'data': coordinates,
+            'unit': 'km',
+            'description': (
+                "The position of the SDO satellite during the observations in cartesian "
+                "heliocentric coordinates.\nThe shape of the data is (N, 3) where N represents "
+                "the time indexes for the data and the 3 the x, y, z position of the satellite."
+            ),
+        }
+        return information
+
+    @Decorators.running_time
+    def _get_pos_stereo_info(self) -> dict[str, str | np.ndarray]:
+        """
+        Gives the STEREO B satellite position information in Cartesian Heliocentric Coordinates.
+
+        Returns:
+            dict[str, str | np.ndarray]: the data and metadata for the STEREO B satellite position
+        """
+
+        # ! wrong as don't have the positions for all the cubes given the 1 minute cadence
+        # * Not using this method for now till discussed with Dr. Auchere.
+
+        # DATA
+        stereo_information = scipy.io.readsav(self._paths['stereo info']).datainfos
+
+        # COORDs
+        coordinates = self._get_pos_code(stereo_information, self._get_pos_stereo_sub)
+
+        # DATA formatting
+        information = {
+            'data': coordinates,
+            'unit': 'km',
+            'description': (
+                "The position of the STEREO B satellite during the observations in cartesian "
+                "heliocentric coordinates.\nThe shape of the data is (413, 3) where 413 "
+                "represents the time indexes for the data and the 3 the x, y, z position of the "
+                "satellite."
+            ),
+        }
+        return information
+
+    def _get_pos_code(
+            self,
+            data: np.recarray | list[str],
+            function: Callable[
+                [QueueType, QueueType[tuple[int, np.ndarray]]],
+                None,
+            ],
+        ) -> npt.NDArray[np.float32]:
+        """
+        To multiprocess the getting of the positions of the SDO and STEREO B satellites.
+
+        Args:
+            data (np.recarray | list[str]): the data information for SDO or STEREO B.
+            function (typing.Callable[[QueueType, QueueType], None]): the function
+                used for each process to get the position of the satellite.
+
+        Returns:
+            np.ndarray: the position of the satellite in cartesian heliocentric coordinates.
+        """
+
+        # SETUP multiprocessing
+        manager = mp.Manager()
+        input_queue: QueueType[tuple[int, str] | None] = manager.Queue()
+        output_queue: QueueType[tuple[int, np.ndarray]] = manager.Queue()
+        for i in range(self._max_len): input_queue.put((i, data[i]))
+        for _ in range(self._nb_processes): input_queue.put(None)
+
+        # RUN processes
+        processes: list[mp.Process] = [None] * self._nb_processes  #type:ignore
+        for i in range(self._nb_processes):
+            p = mp.Process(target=function, args=(input_queue, output_queue))
+            p.start()
+            processes[i] = p
+        for p in processes: p.join()
+
+        # RESULTs formatting
+        coordinates_list: list[np.ndarray] = [None] * self._max_len  #type:ignore
+        while not output_queue.empty():
+            identifier, result = output_queue.get()
+            coordinates_list[identifier] = result
+        coordinates = np.stack(coordinates_list, axis=0, dtype=np.float32)
+        return coordinates
+
+    @staticmethod
+    def _get_pos_sdo_sub(
+            input_queue: QueueType[tuple[int, str] | None],
+            output_queue: QueueType[tuple[int, np.ndarray]],
+        ) -> None:
+        """
+        To get the position of the SDO satellite.
+
+        Args:
+            input_queue (QueueType[tuple[int, str]] | None): the input information for
+                identification and SDO information.
+            output_queue (QueueType[tuple[int, np.ndarray]]): to save the results outside the
+                function.
+        """
+
+        while True:
+            # CHECK queue
+            arguments = input_queue.get()
+            if arguments is None: return
+            identification, filepath = arguments
+
+            # DATA hdu
+            header = astropy.io.fits.getheader(filepath, 1)
+            coords = sunpy.coordinates.frames.HeliographicCarrington(
+                header['CRLN_OBS'] * u.deg,
+                header['CRLT_OBS'] * u.deg,
+                header['DSUN_OBS'] * u.m,
+                obstime=header['DATE-OBS'],
+                observer='self',
+            )
+            coords = coords.represent_as(astropy.coordinates.CartesianRepresentation)
+
+            # CONVERSION to km
+            result = np.array([
+                coords.x.to(u.km).value,
+                coords.y.to(u.km).value,
+                coords.z.to(u.km).value,
+            ])
+            output_queue.put((identification, result))
+
+    @staticmethod
+    def _get_pos_stereo_sub(
+            input_queue: QueueType[tuple[int, np.recarray] | None],
+            output_queue: QueueType[tuple[int, np.ndarray]],
+        ) -> None:
+        """
+        To get the position of the STEREO B satellite.
+
+        Args:
+            input_queue (QueueType[tuple[int, np.recarray]] | None): the input information for
+                identification and SDO information.
+            output_queue (QueueType[tuple[int, np.ndarray]]): to save the results outside the
+                function.
+        """
+
+        while True:
+            # CHECK queue
+            arguments = input_queue.get()
+            if arguments is None: return
+            identification, information_recarray = arguments
+
+            # DATA
+            date = CustomDate(information_recarray.strdate)
+            stereo_date = (
+                f'{date.year}-{date.month}-{date.day}T{date.hour}:{date.minute}:{date.second}'
+            )
+            coords = sunpy.coordinates.frames.HeliographicCarrington(
+                information_recarray.lon * u.deg,
+                information_recarray.lat * u.deg,
+                information_recarray.dist * u.km,
+                obstime=stereo_date,
+                observer='self',
+            )
+            coords = coords.represent_as(astropy.coordinates.CartesianRepresentation)
+
+            # CONVERSION to km
+            result = np.array([
+                coords.x.to(u.km).value,
+                coords.y.to(u.km).value,
+                coords.z.to(u.km).value,
+            ])
+            output_queue.put((identification, result))
+
+    @Decorators.running_time
+    def _raw_group(self, H5PYFile: h5py.File, borders: dict[str, dict[str, str | float]]) -> None:
+        """
+        To create the initial h5py.Group object; where the raw data (with/without feet and/or in
+        Carrington Heliographic Coordinates).
+
+        Args:
+            H5PYFile (h5py.File): the opened file pointer.
+            borders (dict[str, dict[str, str | float]]): the border info (i.e. x_min, etc.) for the
+                given data.
+        """
+
+        # DATA
+        data = self._raw_cubes()
+
+        # GROUP create
+        group = H5PYFile.create_group('Raw')
+        group.attrs['description'] = (
+            "The filament voxels in sparse COO format (i.e. with a coords and values arrays) of "
+            "the initial cubes gotten from Dr. Karine Bocchialini's work.\nFurthermore, the "
+            "necessary information to be able to position the filament relative to the Sun are "
+            "also available. Both cubes, with or without feet, could be inside this group."
+        )
+
+        # GROUP raw cubes
+        group = self.add_cube(group, data, 'Raw cubes', borders=borders)
+        group['Raw cubes'].attrs['description'] = (
+            "The initial voxel data in COO format without the feet for the polynomial."
+        )
+        group['Raw cubes/values'].attrs['description'] = (
+            "The values for each voxel as a 1D numpy array, in the same order than the "
+            "coordinates given in the 'coords' group.\nEach specific bit set to 1 in these uint8 "
+            "values represent a specific information on the voxel. Hence, you can easily filter "
+            "these values given which bit is set to 1.\nThe value information is as follows:\n"
+            "-0b" + "0" * 7 + "1 represents the intersection between the STEREO and SDO point of "
+            "views regardless if the voxel is a duplicate or not.\n"
+            "-0b" + "0" * 6 + "10 represents the no duplicates regions from STEREO's point of "
+            "view.\n"
+            "-0b" + "0" * 5 + "100 represents the no duplicates regions from SDO's point of "
+            "view.\n"
+            "-0b" + "0" * 4 + "1000 represents the no duplicates data from STEREO's point of "
+            "view. This takes into account if a region has a bifurcation.\n"
+            "-0b0001" + "0" * 4 + " represents the no duplicates data from SDO's point of view. "
+            "This takes into account if a region has a bifurcation.\n"
+            "-0b001" + "0" * 5 + " gives out the feet positions.\n"
+            "It is important to note the difference between the second/third bit being set to 1 "
+            "or the fourth/fifth bit being set to 1. For the fourth and fifth bit, the definition "
+            "for a duplicate is more strict. It also takes into account if, in the same region "
+            "(i.e. block of voxels that are in contact), there is a bifurcation. If each branch "
+            "of the bifurcation can be duplicates, then both branches are taken out (not true for "
+            "the second/third bits as the duplicate treatment is done region by region.\n"
+            "Furthermore, it is of course also possible to mix and match to get more varied "
+            "datasets, e.g. -0b00011000 represents the no duplicates data."
+        )
+
+        if self._full:
+            # GROUP raw sky-coords
+            group = self._add_sky_coords(group, data, 'Raw coordinates', borders)
+            group['Raw coordinates'].attrs['description'] = (
+                'The initial data saved as Carrington Heliographic Coordinates in km.'
+            )
+
+        if not self._no_feet:
+            # GROUP raw cubes with feet
+            data, borders = self._with_feet(data, borders)
+            group = self.add_cube(group, data, 'Raw cubes with feet', borders=borders)
+            group['Raw cubes with feet'].attrs['description'] = (
+                'The initial raw data in COO format with the feet positions added.'
+            )
+            group['Raw cubes with feet/values'].attrs['description'] = (
+                group['Raw cubes/values'].attrs['description']
+            )
+
+            if self._full:
+                # GROUP raw sky-coords with feet
+                group = self._add_sky_coords(group, data, 'Raw coordinates with feet', borders)
+                group['Raw coordinates with feet'].attrs['description'] = (
+                    "The initial data with the feet positions added saved as Carrington "
+                    "Heliographic Coordinates in km."
+                )
+
+    @Decorators.running_time
+    def _filtered_group(
+            self,
+            H5PYFile: h5py.File,
+            borders: dict[str, dict[str, str | float]],
+        ) -> None:
+        """
+        To filter the data and save it with feet.
+
+        Args:
+            H5PYFile (h5py.File): the file object.
+            borders (dict[str, dict[str, str | float]]): the border information.
+        """
+
+        # GROUP create
+        group = H5PYFile.create_group('Filtered')
+        group.attrs['description'] = (
+            "This group is based on the data from the 'Raw' HDF5 group. It is made up of already "
+            "filtered data for easier use later but also to be able to add a weight to the feet. "
+            "Hence, the polynomial data for each filtered data group is also available."
+        )
+
+        # DATA
+        data = self._get_COO(H5PYFile, f'Raw/Raw cubes').astype('uint8')
+
+        for option in self._feet_options:
+            # ADD all data
+            new_borders = borders.copy()
+            filtered_data = (data & 0b00000001).astype('uint8')
+            if option != '': filtered_data, new_borders = self._with_feet(filtered_data, borders)
+            group = self.add_cube(
+                group=group,
+                data=filtered_data,
+                data_name=f'All data{option}',
+                values=1 if option=='' else None,
+                borders=new_borders,
+            )
+            group[f'All data{option}'].attrs['description'] = (
+                f"All data, i.e. the 0b00000001 filtered data{option}. Hence, the data represents "
+                "the intersection between the STEREO and SDO point of views.\n"
+                + (
+                    f"The feet are saved with a value corresponding to 0b00100000."
+                    if option != '' else ''
+                )
+            )
+
+            # ADD no duplicates
+            filtered_data = ((data & 0b00011000) == 0b00011000).astype('uint8')
+            if option != '': filtered_data, new_borders = self._with_feet(filtered_data, borders)
+            group = self.add_cube(
+                group=group,
+                data=filtered_data,
+                data_name=f'No duplicates{option}',
+                values=1 if option=='' else None,
+                borders=new_borders,
+            )
+            group[f'No duplicates{option}'].attrs['description'] = (
+                f"The new no duplicates data, i.e. the 0b00011000 filtered data{option}. Hence, "
+                "the data represents all the data without any of the duplicates. Even the "
+                "bifurcations are taken into account. No duplicates should exist in this "
+                "filtering.\n"
+                + (
+                    f"The feet are saved with a value corresponding to 0b00100000."
+                    if option != '' else ''
+                )
+            )
+
+            # ADD SDO los data
+            if option != '': continue
+            filtered_data = ((data & 0b10000000) == 0b10000000).astype('uint8')
+            group = self.add_cube(
+                group=group,
+                data=filtered_data,
+                data_name=f'SDO line of sight',
+                values=1,
+                borders=new_borders,
+            )
+            group[f'SDO line of sight'].attrs['description'] = (
+                "The SDO line of sight data, i.e. the 0b01000000 filtered data. Hence, this data "
+                "represents what is seen by SDO if represented in 3D inside the space of the "
+                "rainbow cube data. The limits of the borders are defined in the .save IDL code "
+                "named new_toto.pro created by Dr. Frederic Auchere."
+            )
+
+            # ADD STEREO los data
+            filtered_data = ((data & 0b01000000) == 0b01000000).astype('uint8')
+            group = self.add_cube(
+                group=group,
+                data=filtered_data,
+                data_name=f'STEREO line of sight',
+                values=1,
+                borders=new_borders,
+            )
+            group[f'STEREO line of sight'].attrs['description'] = (
+                "The STEREO line of sight data, i.e. the 0b01000000 filtered data. Hence, this "
+                "data represents what is seen by STEREO if represented in 3D inside the space of "
+                "the rainbow cube data. The limits of the borders are defined in the .save IDL "
+                "code named new_toto.pro created by Dr. Frederic Auchere."
+            )
+
+    @Decorators.running_time
+    def _integrated_group(
+            self,
+            H5PYFile: h5py.File,
+            borders: dict[str, dict[str, str | float]],
+        ) -> None:
+        """
+        To integrate the data and save it inside a specific HDF5 group.
+
+        Args:
+            H5PYFile (h5py.File): the HDF5 file.
+            borders (dict[str, dict[str, str | float]]): the border information.
+        """
+
+        # GROUP setup
+        group = H5PYFile.create_group('Time integrated')
+        group.attrs['description'] = (
+            "This group has already time integrated data for some of the main data filtering.\n"
+            "This was created for ease of use when further analyzing the structures."
+        )
+
+        # OPTIONs
+        data_options = [
+            f'{data_type}{feet}'
+            for data_type in ['All data', 'No duplicates']
+            for feet in self._feet_options
+        ]
+
+        for option in data_options:
+            # GROUP create
+            inside_group = group.create_group(option)
+            inside_group.attrs['description'] = (
+                f"This group only contains {option.lower()} time integrated data.\n"
+                f"To get border info, please refer to the Filtered/{option} data group."
+                + (
+                    "Furthermore, the feet are saved with values equal to 0b00100000."
+                    if 'with feet' in option else ''
+                )
+            )
+
+            # INTEGRATION full
+            group_name = 'Full integration'
+            data, new_borders = self._full_integration(
+                H5PYFile=H5PYFile,
+                path_data=f'Filtered/{option}',
+                borders=borders,
+            )
+
+            # ADD data
+            inside_group = self.add_cube(
+                group=inside_group,
+                data=data,
+                data_name=group_name,
+                values=None if 'with feet' in option else 1,
+                borders=new_borders,
+            )
+            inside_group[group_name].attrs['description'] = (
+                f"This group contains the {option.lower()} data fully integrated."
+            )
+
+            # INTEGRATION time dependent
+            for integration_time in self._integration_time:
+                # INTEGRATION setup
+                time_hours = int(integration_time / 3600)
+                group_name = f'Time integration of {time_hours} hours'
+
+                # DATA
+                data, new_borders = self._time_integration(
+                    H5PYFile=H5PYFile,
+                    path_data=f'Filtered/{option}',
+                    time=integration_time,
+                    borders=borders, 
+                )
+
+                # ADD data
+                inside_group = self.add_cube(
+                    group=inside_group,
+                    data=data,
+                    data_name=group_name,
+                    values=None if 'with feet' in option else 1,
+                    borders=new_borders,
+                )
+                inside_group[group_name].attrs['description'] = (
+                    f"This group contains the {option.lower()} data integrated on {time_hours} "
+                    "hours intervals."
+                )
+
+    def _full_integration(
+            self,
+            H5PYFile: h5py.File,
+            path_data: str,
+            borders: dict[str, dict[str, str | float]],
+        ) -> tuple[sparse.COO, dict[str, dict[str, str | float]]]:
+        """
+        To integrate all the data from a given data group.
+
+        Args:
+            H5PYFile (h5py.File): the HDF5 file.
+            path_data (str): the path to the data group to be integrated.
+            borders (dict[str, dict[str, str | float]]): the border information.
+
+        Returns:
+            tuple[sparse.COO, dict[str, dict[str, str | float]]]: the integrated data and the new
+                corresponding data borders.
+        """
+
+        # DATA
+        data = self._get_COO(H5PYFile, path_data.removesuffix(' with feet'))
+
+        # INTEGRATION full
+        integration = sparse.COO.any(data, axis=0)
+        return integration, borders  # ? is the border choice the right one ?
+
+    @Decorators.running_time
+    def _time_integration(
+            self,
+            H5PYFile: h5py.File,
+            path_data: str,
+            time: int,
+            borders: dict[str, dict[str, str | float]],
+        ) -> tuple[sparse.COO, dict[str, dict[str, str | float]]]:
+        """
+        # todo update docstring
+        Gives the time integration of all the data for a given time interval in seconds.
+
+        Args:
+            H5PYFile (h5py.File): the HDF5 file.
+            path_data (str): the path to the data group to be integrated.
+            time (int): the integration time (in seconds).
+            borders (dict[str, dict[str, str | float]]): the border information.
+
+        Returns:
+            tuple[sparse.COO, dict[str, dict[str, str | float]]]: the integration data and the new
+                corresponding data borders.
+        """
+
+        # DATA path
+        filepath = os.path.join(self._paths['save'], self.filename)
+
+        # FLUSH to make written data visible
+        H5PYFile.flush()
+
+        # MULTIPROCESSING setup
+        manager = mp.Manager()
+        input_queue = manager.Queue()
+        output_queue = manager.Queue()
+        for i in range(self._max_len): input_queue.put((i, time))
+        for _ in range(self._nb_processes): input_queue.put(None)
+
+        # RUN processes
+        processes: list[mp.Process] = cast(list[mp.Process], [None] * self._nb_processes)
+        for i in range(self._nb_processes):
+            p = mp.Process(
+                target=self._time_integration_sub,
+                kwargs={
+                    'input_queue': input_queue,
+                    'output_queue': output_queue,
+                    'filepath': filepath,
+                    'path_data': path_data,
+                    'dates_seconds': self._dates_seconds,
+                },
+            )
+            p.start()
+            processes[i] = p
+        for p in processes: p.join()
+
+        # RESULTs formatting 
+        data_list: list[sparse.COO] = cast(list[sparse.COO], [None] * self._max_len)
+        while not output_queue.empty():
+            identification, result = output_queue.get()
+            data_list[identification] = result
+        data: sparse.COO = cast(sparse.COO, sparse.stack(data_list, axis=0).astype('uint8'))
+
+        # BORDERs update
+        if 'with feet' in path_data:
+            data, new_borders = self._with_feet(data, borders)
+        else: 
+            new_borders = borders.copy()
+        return data, new_borders
+
+    @staticmethod
+    def _time_integration_sub(
+            input_queue: QueueType[tuple[int, int] | None],
+            output_queue: QueueType[tuple[int, sparse.COO]],
+            filepath: str,
+            path_data: str,
+            dates_seconds: list[int],
+        ) -> None:
+        """
+        To multiprocess the time integration of the cubes. This does it for each given date.
+
+        Args:
+            input_queue (QueueType[tuple[int, int] | None]): the input arguments in a
+                mp.Manager.Queue().
+            output_queue (QueueType[tuple[int, sparse.COO]]): the results in a np.Manager.Queue().
+            filepath (str): the path to the HDF5 file.
+            path_data (str): the path to the data group to be integrated.
+            dates_seconds (list[int]): the cumulative date corresponding to each cube (in seconds).
+        """
+
+        # DATA fetch
+        with h5py.File(filepath, 'r', locking=False) as H5PYFile:
+            data = Create._get_COO(H5PYFile, path_data.removesuffix(' with feet'))
+
+        while True:
+            # CHECK queue
+            arguments = input_queue.get()
+            if arguments is None: return
+            index, integration_time = arguments
+            date = dates_seconds[index]
+
+            date_min = date - integration_time / 2.
+            date_max = date + integration_time / 2.
+
+            # RESULTs save
+            chunk = Create._cube_integration(data, date_max, date_min, dates_seconds)
+            output_queue.put((index, chunk))
+
+    @staticmethod
+    def _cube_integration(
+            data: sparse.COO,
+            date_max: float,
+            date_min: float,
+            dates: list[int],
+        ) -> sparse.COO:
+        """
+        To integrate the date cubes given the max and min date (in seconds) for the integration
+        limits.
+
+        Args:
+            data (sparse.COO): the data to integrate.
+            date_max (float): the maximum date (in seconds) for he integration.
+            date_min (float): the minimum date (in seconds) for the integration.
+            dates (list[int]): the dates of the cubes in seconds.
+
+        Returns:
+            sparse.COO: the integrated cubes.
+        """
+
+        chunk = []
+        for date, cube in zip(dates, data):  #type:ignore
+
+            if date < date_min:
+                continue
+            elif date <= date_max:
+                chunk.append(cube)
+            else:
+                break
+
+        # CHECK if empty
+        if chunk == []:
+            return sparse.COO(coords=[], data=[], shape=data.shape[1:]).astype('uint8')
+        elif len(chunk) == 1:
+            return chunk[0]
+        else:
+            COO: sparse.COO = cast(sparse.COO, sparse.stack(chunk, axis=0))
+            return sparse.COO.any(COO, axis=0)
+
+    @staticmethod
+    def _get_COO(H5PYFile: h5py.File, group_path: str) -> sparse.COO:
+        """
+        To get the sparse.COO object from the corresponding coords and values.
+
+        Args:
+            H5PYFile (h5py.File): the file object.
+            group_path (str): the path to the group where the data is stored.
+
+        Returns:
+            sparse.COO: the corresponding sparse data.
+        """
+
+        data_coords: np.ndarray = cast(h5py.Dataset, H5PYFile[group_path + '/coords'])[...]
+        data_data: np.ndarray = cast(h5py.Dataset, H5PYFile[group_path + '/values'])[...]
+        data_shape = np.max(data_coords, axis=1) + 1
+        result = sparse.COO(coords=data_coords, data=data_data, shape=data_shape)
+        return result
+
+    @Decorators.running_time
+    def _polynomial_group(self, H5PYFile: h5py.File) -> None:
+        """
+        To add the polynomial information to the file.
+
+        Args:
+            H5PYFile (h5py.File): the file object.
+        """
+
+        # OPTIONs
+        data_options = [
+            f'{data_type}{feet}'
+            for data_type in ['All data', 'No duplicates']
+            for feet in self._feet_options
+        ]
+
+        sub_options = [
+            f'/Time integration of {int(time / 3600)} hours'
+            for time in self._integration_time
+        ] + ['/Full integration']
+
+        # INTEGRATED data
+        main_path_2 = 'Time integrated/'
+        for main_option in data_options:
+            for sub_option in sub_options:
+                group_path = main_path_2 + main_option + sub_option
+                data = self._get_COO(H5PYFile, group_path).astype('uint16')
+
+                # ADD polynomial
+                self._add_polynomial(cast(h5py.Group, H5PYFile[group_path]), data)
+
+    @Decorators.running_time
+    def _raw_cubes(self) -> sparse.COO:
+        """
+        To get the initial raw cubes as a sparse.COO object.
+
+        Returns:
+            sparse.COO: the raw cubes.
+        """
+
+        # SETUP multiprocessing
+        cube_nb = len(self._cube_numbers)
+        processes_nb = min(self._processes, cube_nb)
+        manager = mp.Manager()
+        input_queue = manager.Queue()
+        output_queue = manager.Queue()
+
+        # INPUT populate
+        for number, identifier in enumerate(self._cube_numbers):
+            input_queue.put((
+                identifier,
+                os.path.join(self._paths['cubes'], f'cube{self._numbers[number]:03d}.save'),
+            ))
+        for _ in range(processes_nb): input_queue.put(None)
+
+        # RUN processes
+        processes: list[mp.Process] = [None] * processes_nb  #type:ignore
+        for i in range(processes_nb): 
+            p = mp.Process(
+                target=self._raw_cubes_sub,
+                args=(input_queue, output_queue),
+            )
+            p.start()
+            processes[i] = p
+        for p in processes: p.join()
+
+        # RESULTs formatting
+        rawCubes_list: list[sparse.COO] = [None] * self._max_len  #type:ignore
+        while not output_queue.empty():
+            identifier, result = output_queue.get()
+            rawCubes_list[identifier] = result
+
+        # FILL NoneTypes
+        rawCubes_list = [
+            sparse.COO(
+                coords=[],
+                data=[],
+                shape=rawCubes_list[self._cube_numbers[0]].shape,
+            ).astype('uint8')
+            if cube is None else cube  
+            for cube in rawCubes_list
+        ]
+        rawCubes: sparse.COO = sparse.stack(rawCubes_list, axis=0)
+        return rawCubes
+
+    @staticmethod
+    def _raw_cubes_sub(
+            input_queue: QueueType[tuple[int, str] | None],
+            output_queue: QueueType[tuple[int, sparse.COO]],
+        ) -> None:
+        """
+        To get the raw data from each cube.
+
+        Args:
+            input_queue (QueueType[tuple[int, str] | None]): the input data (identifier, filepath)
+                for each cube.
+            output_queue (QueueType[tuple[int, sparse.COO]]): the output data (identifier, data)
+                for each cube.
+        """
+
+        while True:
+
+            # CHECK inputs
+            args = input_queue.get()
+            if args is None: return
+            cube_number, filepath = args
+
+            # DATA import
+            data = scipy.io.readsav(filepath)
+            cube: np.ndarray = data.cube
+
+            # CHECK keywords
+            if ('cube1' in data) and ('cube2' in data):
+                # LOS data
+                cube1: np.ndarray = data.cube1.astype('uint8') * 0b01000000
+                cube2: np.ndarray = data.cube2.astype('uint8') * 0b10000000
+
+                result = (cube + cube1 + cube2).astype('uint8')
+            else:
+                result = cube.astype('uint8')
+
+            # SAVE
+            result = np.transpose(result, (2, 1, 0))
+            output_queue.put((cube_number, Create._sparse_data(result)))
+
+    @staticmethod
+    def _sparse_data(cubes: np.ndarray) -> sparse.COO:
+        """
+        Changes data to a sparse representation.
+
+        Args:
+            cubes (np.ndarray): the initial array.
+
+        Returns:
+            sparse.COO: the corresponding sparse COO array.
+        """
+
+        sparse_cubes = sparse.COO(cubes)
+        # the .to_numpy() method wasn't used as the idx_type argument isn't working properly
+        sparse_cubes.coords = sparse_cubes.coords.astype('uint16')  # to save RAM
+        return sparse_cubes
+
+    def _add_sky_coords(
+            self,
+            group: h5py.File | h5py.Group,
+            data: sparse.COO,
+            data_name: str,
+            borders: dict[str, dict[str, str | float]],
+        ) -> h5py.File | h5py.Group:
+        """
+        To add to an h5py.Group, the data and metadata of the Carrington Heliographic Coordinates
+        for a corresponding cube index spare.COO object. 
+        This takes also into account the border information.
+
+        Args:
+            group (h5py.File | h5py.Group): the Group where to add the data information.
+            data (sparse.COO): the data that needs to be included in the file.
+            data_name (str): the group name to be used in the file.
+            borders (dict[str, dict[str, str | float]]): the data border information.
+
+        Returns:
+            h5py.File | h5py.Group: the updated group.
+        """
+
+        # SKY COORDs setup
+        sky_coords = self._carrington_skyCoords(data, borders)
+        data_list: list[np.ndarray] = [None] * len(sky_coords)  #type:ignore
+        for i, sky_coord in enumerate(sky_coords):
+            x: np.ndarray = sky_coord.cartesian.x.value
+            y: np.ndarray = sky_coord.cartesian.y.value
+            z: np.ndarray = sky_coord.cartesian.z.value
+            cube = np.stack([x, y, z], axis=0)
+
+            # (x, y, z) -> (t, x, y, z)
+            time_row = np.full((1, cube.shape[1]), i)
+            data_list[i] = np.vstack([time_row, cube])
+        result = np.hstack(data_list).astype(np.float32)
+
+        # DATA formatting
+        raw = {
+            'description': "Default",
+            'coords': {
+                'data': result,
+                'unit': 'km',
+                'description': (
+                    "The t, x, y, z coordinates of the cube voxels.\nThe shape is (4, N) where "
+                    "the rows represent t, x, y, z where t the time index (i.e. which cube it "
+                    "is), and N the total number of voxels. Furthermore, x, y, z, represent the "
+                    "X, Y, Z axis Carrington Heliographic Coordinates.\n"
+                ),
+            },
+        }
+
+        # BORDERs add
+        raw |= borders  #type:ignore
+
+        # ADD group
+        self.add_group(group, raw, data_name)
+        return group
+
+    def _add_polynomial(self, group: h5py.Group, data: sparse.COO) -> None:
+        """
+        To add to an h5py.Group, the polynomial curve and parameters given the data to fit.
+
+        Args:
+            group (h5py.Group): the group in which an polynomial group needs to be added.
+            data (sparse.COO): the data to fit.
+
+        Returns:
+            h5py.Group: the updated group.
+        """
+
+        polynomial_kwargs = {
+            'data': data, 
+            'feet_sigma': self._feet_sigma,
+            'south_sigma': self._south_leg_sigma,
+            'leg_threshold': self._leg_threshold,
+            'processes': self._processes,  # ? why not nb_processes and processes ???
+            'precision_nb': self._polynomial_points,
+            'full': self._full,
+            'verbose': self._verbose,
+            'flush': self._flush,
+        }
+
+        # N-ORDERs 
+        for n_order in self._polynomial_order:
+            instance = Polynomial(order=n_order, **polynomial_kwargs)
+
+            info = instance.get_information()
+            self.add_group(group, info, f'{n_order}th order polynomial')
+
+    def _with_feet(
+            self,
+            data: sparse.COO,
+            borders: dict[str, dict[str, str | float]],
+        ) -> tuple[sparse.COO, dict[str, dict[str, str | float]]]:
+        """
+        Adds feet to a given initial cube index data as a sparse.COO object.
+
+        Args:
+            data (sparse.COO): the data to add feet to.
+            borders (dict[str, dict[str, str | float]]): the initial data borders.
+
+        Returns:
+            tuple[sparse.COO, dict[str, dict[str, str | float]]]: the new_data with feet and the
+                corresponding borders data and metadata.
+        """
+
+        # CHEAT type checking
+        borders: dict[str, dict[str, float]] = cast(dict[str, dict[str, float]], borders)
+
+        # COORDs feet
+        x = self._feet.cartesian.x.to(u.km).value
+        y = self._feet.cartesian.y.to(u.km).value
+        z = self._feet.cartesian.z.to(u.km).value
+        positions = np.stack([x, y, z], axis=0)
+
+        # BORDERs update
+        x_min, y_min, z_min = np.min(positions, axis=1) 
+        x_min: float = x_min if x_min <= borders['xt_min']['data'] else borders['xt_min']['data']
+        y_min: float = y_min if y_min <= borders['yt_min']['data'] else borders['yt_min']['data']
+        z_min: float = z_min if z_min <= borders['zt_min']['data'] else borders['zt_min']['data']
+        new_borders = self.create_borders((x_min, y_min, z_min))
+
+        # COORDs feet indexes
+        positions[0, :] -= borders['xt_min']['data']
+        positions[1, :] -= borders['yt_min']['data']
+        positions[2, :] -= borders['zt_min']['data']
+        positions /= self._dx['data']
+        positions = np.round(positions).astype('int32')
+
+        # CUBEs setup
+        init_coords = data.coords
+        # (x, y, z) -> (t, x, y, z)
+        feet = np.hstack([
+            np.vstack((np.full((1, 2), time), positions))
+            for time in range(self._max_len)
+        ])
+
+        # ADD feet
+        init_coords = np.hstack([init_coords, feet]).astype('int32')
+
+        # INDEXEs positive
+        x_min, y_min, z_min = np.min(positions, axis=1).astype(int)  
+        if x_min < 0: init_coords[1, :] -= x_min
+        if y_min < 0: init_coords[2, :] -= y_min  # ? not sure what I meant there
+        if z_min < 0: init_coords[3, :] -= z_min
+
+        # COO
+        shape = np.max(init_coords, axis=1) + 1
+        feet_values = np.repeat(np.array([0b00100000], dtype='uint8'), self._max_len * 2)
+        values = np.concatenate([data.data, feet_values], axis=0)
+        data = sparse.COO(coords=init_coords, data=values, shape=shape).astype('uint8')
+        return data, new_borders
+
+    def _carrington_skyCoords(
+            self,
+            data: sparse.COO,
+            borders: dict[str, dict[str, str | float]],
+        ) -> list[astropy.coordinates.SkyCoord]:
+        """
+        Converts sparse.COO cube index data to a list of corresponding astropy.coordinates.SkyCoord
+        objects.
+
+        Args:
+            data (sparse.COO): the cube index data to be converted.
+            borders (dict[str, dict[str, float]]): the input data border information.
+
+        Returns:
+            list[coordinates.SkyCoord]: corresponding list of the coordinates for the cube index
+                data. They are in Carrington Heliographic Coordinates. 
+        """
+
+        # CHEAT type checking
+        borders: dict[str, dict[str, float]] = cast(dict[str, dict[str, float]], borders)
+        
+        # COORDs
+        coords: npt.NDArray[np.float64] = data.coords.astype('float64')
+
+        # CONVERSION heliocentric in km
+        coords[1, :] = coords[1, :] * self._dx['data'] + borders['xt_min']['data']  #type:ignore
+        coords[2, :] = coords[2, :] * self._dx['data'] + borders['yt_min']['data']  #type:ignore
+        coords[3, :] = coords[3, :] * self._dx['data'] + borders['zt_min']['data']  #type:ignore
+
+        # SETUP multiprocessing
+        manager = mp.Manager()
+        input_queue = manager.Queue()
+        output_queue = manager.Queue()
+        shm, shared = Shared.create(coords)
+        for i in range(self._max_len): input_queue.put(i)
+        for _ in range(self._nb_processes): input_queue.put(None)
+
+        # RUN processes
+        processes: list[mp.Process] = [None] * self._nb_processes  #type:ignore
+        for i in range(self._nb_processes):
+            process = mp.Process(
+                target=self._skyCoords_slice,
+                args=(shared, input_queue, output_queue),
+            )
+            process.start()
+            processes[i] = process
+        for p in processes: p.join()
+        shm.unlink()
+
+        # RESULTs formatting
+        all_SkyCoords: list[astropy.coordinates.SkyCoord] = cast(
+            list[astropy.coordinates.SkyCoord],
+            [None] * self._max_len,
+        )
+        while not output_queue.empty():
+            identifier, result = output_queue.get()
+            all_SkyCoords[identifier] = result
+        return all_SkyCoords
+
+    @staticmethod
+    def _skyCoords_slice(
+            coords_dict: dict[str, Any],
+            input_queue: QueueType[int | None],
+            output_queue: QueueType[tuple[int, astropy.coordinates.SkyCoord]],
+        ) -> None:
+        """
+        To create an astropy.coordinates.SkyCoord object for a singular cube (i.e. for a unique
+        time index).
+
+        Args:
+            coords_dict (dict[str, Any]): information to find the sparse.COO(data).coords
+                multiprocessing.shared_memory.SharedMemory object.
+            input_queue (QueueType[int | None]): multiprocessing.Manager.Queue object used for the
+                function inputs.
+            output_queue (QueueType[tuple[int, astropy.coordinates.SkyCoord]]):
+                multiprocessing.Manager.Queue object used to extract the function results.
+        """
+
+        # DATA open
+        shm, coords = Shared.open(coords_dict)
+
+        while True:
+            # CHECK queue
+            index = input_queue.get()
+            if index is None: break
+
+            # DATA section
+            slice_filter: np.ndarray = (coords[0, :] == index)
+            cube: np.ndarray = coords[:, slice_filter]
+
+            # COORDs re-projected carrington
+            skyCoord = astropy.coordinates.SkyCoord(
+                cube[1, :], cube[2, :], cube[3, :], 
+                unit=u.km,
+                frame=sunpy.coordinates.frames.HeliographicCarrington,
+                representation_type='cartesian'
+            )
+
+            # SAVE
+            output_queue.put((index, skyCoord))
+        shm.close()
+
+
+
+if __name__=='__main__':
+
+    instance = Create(
+        filename='test.h5',
+        processes=32,
+        integration_time=[3, 6, 12, 24],
+        polynomial_order=[4],
+        feet_sigma=20,
+        south_leg_sigma=20,
+        leg_threshold=0.03,
+        full=False,
+        no_feet=True,
+        compression_lvl=9,
+    )
