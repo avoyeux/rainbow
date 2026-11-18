@@ -1,8 +1,8 @@
 # KEYWORD ARGUMENTs for the 'create' command.
 filename: 'fake2.h5'
-integration_time: null
+integration_time: []
 polynomial_points: 1_000_000
-polynomial_order: null
+polynomial_order: []
 feet_lon_lat: [[-177, 14.5], [-163.5, 16.5]]
 feet_sigma: 1.e-4
 south_leg_sigma: 5
