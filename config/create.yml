@@ -1,5 +1,5 @@
 # KEYWORD ARGUMENTs for the 'create' command.
-filename: 'fake2.h5'
+filename: 'test.h5'
 integration_time: []
 polynomial_points: 1_000_000
 polynomial_order: []

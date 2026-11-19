@@ -460,7 +460,6 @@ class Create(BaseHDF5Protuberance):
         meta_info = self._get_cube_dates_info()
         sdo_info = self._get_pos_sdo_info()
         stereo_info = self._get_pos_stereo_info()
-        raise NotImplementedError
 
         # RUN information
         run_info = self._get_run_information()

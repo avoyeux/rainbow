@@ -50,6 +50,9 @@ class StereoPos:
         self._dates = dates
         self._positions = positions
 
+        # RUN
+        self._run()
+
     def _run(self) -> None:
         """
         Runs the plot on each axis.
@@ -60,9 +63,9 @@ class StereoPos:
 
         # PLOT for each axis
         axes = ('x', 'y', 'z')
-        for axis, x in zip(axes, self._positions.T): self._plot(axis, x, dates)  #type:ignore
+        for axis, y in zip(axes, self._positions.T): self._plot(axis, dates, y)  #type:ignore
 
-    def _plot(self, axis: str, x: npt.NDArray[np.float32], y: list[float]) -> None:
+    def _plot(self, axis: str, x: list[float], y: npt.NDArray[np.float32]) -> None:
         """
         Test plot for a given axis.
         """

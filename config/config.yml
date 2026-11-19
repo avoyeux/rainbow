@@ -14,7 +14,7 @@ root_path: &root !rootpath  # dynamic root path (where virtual env is)
 dir:
     _path: &_dir !join [*root, 'data']
 
-    temp: !join [*_dir, 'temporary']
+    temp: !join [*_dir, 'temp']
 
     input:
         path: &_input !join [*_dir, 'input']
@@ -87,7 +87,7 @@ dir:
 file:
     stereo_info: !join [*_stereo, 'stereo_304.save']
     timestamps: !join [*_input, 'SDO_timestamps.txt']
-    data: !join [*_hdf5, 'data.h5']
+    data: !join [*_hdf5, 'test.h5']
 
     # Commands
     _path: &_config !join [*root, 'config']
