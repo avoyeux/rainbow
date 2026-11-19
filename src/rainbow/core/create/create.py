@@ -26,6 +26,7 @@ from astropy import units as u
 from common import Decorators, CustomDate
 
 # IMPORTs local
+from .stereo import Stereo
 from rainbow.config import config
 from rainbow.core.miscellaneous.shared_memory import Shared
 from rainbow.core.data.helpers.all_sdo_dates import AllSDOMetadata
@@ -176,7 +177,6 @@ class Create(BaseHDF5Protuberance):
         paths = {
             'cubes': config.dir.input.cubes,
             'intensities': config.dir.input.stereo.wave304.int,
-            'stereo info': config.file.stereo_info,
             'save': config.dir.output.hdf5,
         }
         return paths
@@ -373,8 +373,8 @@ class Create(BaseHDF5Protuberance):
             ]).astype('S19'),
             'unit': 'none',
             'description': (
-                "The dates of the STEREO B 30.4nm acquisitions. These represent all the possible "
-                "dates and are indexed in the same way than the data cubes."
+                "The dates of the SDO acquisitions. These represent all the possible dates and "
+                "are indexed in the same way than the data cubes."
             ),
         }
         ias_path_info = {  
@@ -459,7 +459,8 @@ class Create(BaseHDF5Protuberance):
         # METADATA
         meta_info = self._get_cube_dates_info()
         sdo_info = self._get_pos_sdo_info()
-        # stereo_info = self.get_pos_stereo_info()
+        stereo_info = self._get_pos_stereo_info()
+        raise NotImplementedError
 
         # RUN information
         run_info = self._get_run_information()
@@ -469,7 +470,7 @@ class Create(BaseHDF5Protuberance):
         self.add_dataset(H5PYFile, self._dx, 'dx')
         for key in meta_info.keys(): self.add_dataset(H5PYFile, meta_info[key], key)
         self.add_dataset(H5PYFile, sdo_info, 'SDO positions')
-        # self.add_dataset(H5PYFile, stereo_info, 'STEREO B positions')
+        self.add_dataset(H5PYFile, stereo_info, 'STEREO B positions')
         self.add_group(H5PYFile, run_info, 'Specific information')
 
     def _get_run_information(self) -> dict[str, dict[str, str | int | float]]:
@@ -544,32 +545,30 @@ class Create(BaseHDF5Protuberance):
         return information
 
     @Decorators.running_time
-    def _get_pos_stereo_info(self) -> dict[str, str | np.ndarray]:
+    def _get_pos_stereo_info(self) -> dict[str, str | npt.NDArray[np.float32]]:
         """
-        Gives the STEREO B satellite position information in Cartesian Heliocentric Coordinates.
+        Gives the STEREO B satellite positions information in Cartesian Heliocentric Coordinates.
 
         Returns:
-            dict[str, str | np.ndarray]: the data and metadata for the STEREO B satellite position
+            dict[str, str | npt.NDArray[np.float32]].
+                the data and metadata for the STEREO B satellite positions.
         """
 
-        # ! wrong as don't have the positions for all the cubes given the 1 minute cadence
-        # * Not using this method for now till discussed with Dr. Auchere.
-
-        # DATA
-        stereo_information = scipy.io.readsav(self._paths['stereo info']).datainfos
-
-        # COORDs
-        coordinates = self._get_pos_code(stereo_information, self._get_pos_stereo_sub)
+        stereo = Stereo(
+            dates=[meta.date_obs for meta in self._sdo_metadata],  #type:ignore
+            processes=self._processes,
+        )
 
         # DATA formatting
         information = {
-            'data': coordinates,
+            'data': stereo.positions,
             'unit': 'km',
             'description': (
                 "The position of the STEREO B satellite during the observations in cartesian "
-                "heliocentric coordinates.\nThe shape of the data is (413, 3) where 413 "
+                "heliocentric coordinates.\nThe shape of the data is (N, 3) where N "
                 "represents the time indexes for the data and the 3 the x, y, z position of the "
-                "satellite."
+                "satellite.\n Some of the positions are not initially available so they were "
+                "interpolated using a cubic spline."
             ),
         }
         return information

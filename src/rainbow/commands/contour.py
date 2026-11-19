@@ -103,7 +103,7 @@ class Contour:
             with counter.get_lock():
                 counter.value -= 1
                 index = counter.value
-                if index < 0: break
+                if index < 0: return
 
             # RUN
             Create(index, verbose - 1, flush)

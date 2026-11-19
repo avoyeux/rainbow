@@ -221,7 +221,7 @@ class TotoInputs:
         processes_nb = min(self._processes, self._nb_cubes)
 
         if processes_nb > 1:
-            counter = mp.Value('i', 0)
+            counter: CounterType[int] = mp.Value('i', 0)
 
             # MULTIPROCESSING run
             processes: list[mp.Process] = [None] * processes_nb  #type:ignore

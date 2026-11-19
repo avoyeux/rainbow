@@ -14,7 +14,7 @@ root_path: &root !rootpath  # dynamic root path (where virtual env is)
 dir:
     _path: &_dir !join [*root, 'data']
 
-    temporary: !join [*_dir, 'temporary']
+    temp: !join [*_dir, 'temporary']
 
     input:
         path: &_input !join [*_dir, 'input']
