@@ -26,6 +26,7 @@ from common import Decorators, Plot
 # IMPORTs local
 from rainbow.config import config
 from .sun import Sun
+from .camera import Camera, CubeInfo as CameraInfo
 from .vis_dataclasses import (
     CubesData, CubesConstants, CubeInfo, UniqueCubeInfo,
     PolynomialData, UniquePolynomialData,
@@ -34,6 +35,9 @@ from .vis_dataclasses import (
 # TYPE ANNOTATIONs
 from typing import TYPE_CHECKING, Any, overload, Literal, cast
 if TYPE_CHECKING:
+    # IMPORTs third-party
+    import numpy.typing as npt
+
     # IMPORTs local
     from rainbow.typing import VoxelAlias, JsLinkAlias
 
@@ -42,7 +46,7 @@ __all__ = ['K3dAnimation']
 
 # todo need to improve the names of the different datasets in the visualization
 # todo need to be able to add the extended version of the polynomial fit
-
+# todo when using STEREO POV, need to set the camera fov properly (not centered right now and too large)
 
 
 class Setup:
@@ -101,7 +105,7 @@ class Setup:
         self._feet = ' with feet' if self._choices['with feet'] else ''
 
         # RUN
-        self._cubes: CubesData = self._get_data()
+        self._cubes = self._get_data()
 
     def _get_choices(self, plot_choices: list[str]) -> dict[str, bool]:
         """
@@ -125,7 +129,6 @@ class Setup:
             'line of sight sdo', 'line of sight stereo',
             'pov sdo', 'pov stereo',
             'fit', 'with feet', 'extended fit',
-            'test points', 'test cube',
         ]
         choices_kwargs = {
             key: False 
@@ -250,51 +253,23 @@ class Setup:
         # POVs sdo, stereo
         if self._choices['pov sdo']:
             # SDO positions
-            sdo_positions: np.ndarray = cast(h5py.Dataset, HDF5File['SDO positions'])[...]
+            sdo_positions: npt.NDArray = HDF5File['SDO positions'][...]
 
             # DATA formatting
-            cubes.sdo_pos = cast(
-                np.ndarray[tuple[int], np.dtype[np.float32]],
-                (sdo_positions[self.constants.time_indexes] / self.constants.dx).astype('float32'),
-            )
+            cubes.sdo_pos = (
+                sdo_positions[self.constants.time_indexes] / self.constants.dx
+            ).astype(np.float32)
         if self._choices['pov stereo']:
             # STEREO positions
             stereo_positions: np.ndarray = cast(h5py.Dataset, HDF5File['STEREO B positions'])[...]
 
             # DATA formatting
-            cubes.stereo_pos = cast(
-                np.ndarray[tuple[int], np.dtype[np.float32]],
-                (
-                    stereo_positions[self.constants.time_indexes] / self.constants.dx
-                ).astype('float32'),
-            )
+            cubes.stereo_pos = (
+                stereo_positions[self.constants.time_indexes] / self.constants.dx
+            ).astype(np.float32)
             # todo will need to add the POV center
 
-        if self._choices['test cube']:
-            cubes.test_cube = self.get_cube_info(
-                HDF5File=HDF5File,
-                group_path='Test data/Sun surface',
-                colour='yellow',
-                opacity=0.7,
-                interpolate=False,
-                cube_type='unique',
-            )
         return cubes
-
-    def get_sdo_fov(self) -> float:
-        """
-        Gets the field of view of SDO.
-
-        Returns:
-            float: the field of view of SDO.
-        """
-
-        # FOV get
-        hdul = fits.open(os.path.join(config.dir.input.sdo.mask, 'AIA_fullhead_000.fits.gz'))
-        image_shape = hdul[0].data.shape
-        fov_degrees = image_shape[0] * hdul[0].header['CDELT1'] / 3600
-        hdul.close()
-        return fov_degrees # ? in my old code I divide it by 3, no clue why
 
     def get_default_data(self, HDF5File: h5py.File) -> CubesConstants:
         """
@@ -664,7 +639,7 @@ class K3dAnimation(Setup):
             plot_height: int = 1260, 
             sleep_time: int | float = 2, 
             camera_zoom_speed: int | float = 0.7, 
-            camera_pos: tuple[int | float, int | float, int | float] | None = None,
+            camera_pos: tuple[float, float, float] | None = None,
             camera_fov: float = 0.23,
             up_vector: tuple[int, int, int] = (0, 0, 1), 
             visible_grid: bool = False, 
@@ -673,6 +648,7 @@ class K3dAnimation(Setup):
             **kwargs,
         ) -> None:
         """
+        todo update docstring
         To visualize the data in k3d. The fetching and naming of the data is done in the parent
         class.
 
@@ -704,19 +680,12 @@ class K3dAnimation(Setup):
         super().__init__(**kwargs)
 
         # ATTRIBUTEs
-        self.plot_height = plot_height  # the height in pixels of the plot (initially it was 512)
         self.sleep_time = sleep_time  # sets the time between each frames (in seconds)
-        self.camera_zoom_speed = camera_zoom_speed  # zoom speed of the camera 
-        self.camera_pos = camera_pos  # position of the camera multiplied by 1au
-        self.camera_fov = self.get_sdo_fov() if self._choices['pov sdo'] else camera_fov  # in deg
-        self.up_vector = up_vector  # up vector for the camera
-        self.visible_grid = visible_grid  # setting the grid to be visible or not
         self.texture_resolution = texture_resolution
         self.compression_level = compression_level
         self.outlines = outlines
 
         # PLACEHOLDERs
-        self.plot: k3d.plot.Plot  # plot object
         self.plot_alldata: list[VoxelAlias] # voxels plot of the all data 
         self.plot_dupli_new: list[VoxelAlias]  # same for the second method
         self.plot_full_alldata: list[VoxelAlias]  # voxels plot for the full integration
@@ -731,21 +700,59 @@ class K3dAnimation(Setup):
         self.time_link: JsLinkAlias  # JavaScript Link between the two widgets
 
         # RUN
-        self.animation()
+        self._plot: Any = k3d.plot(grid_visible=visible_grid)  # black: background_color=0x000000 #type:ignore
+        self._plot.height = plot_height
+        self._camera = self._get_camera(
+            zoom=camera_zoom_speed,
+            speed=camera_zoom_speed,
+            fov=camera_fov,
+            up=up_vector,
+        )
+        self._animation()
 
-    def animation(self) -> None:
+    def _get_camera(
+            self,
+            zoom: float,
+            speed: float,
+            fov: float,
+            up: tuple[int, int, int],
+        ) -> Camera:
+        # todo add docstring
+
+        # POS
+        if self._cubes.sdo_pos is not None:
+            satellite = 'sdo'
+            pos = self._cubes.sdo_pos
+        elif self._cubes.stereo_pos is not None:
+            satellite = 'stereo'
+            pos = self._cubes.stereo_pos
+        else:
+            satellite = None
+            au_in_solar_r = 215  # 1 au in solar radii
+            distance_to_sun = au_in_solar_r * self._solar_r / self.constants.dx
+            print("No 'camera_pos', setting default values.")
+            pos = (- distance_to_sun, -0.5 * distance_to_sun, 0)
+
+        cube: CubeInfo = self.find_first_cube()  #type:ignore
+        camera = Camera(
+            plot=self._plot,
+            cube=CameraInfo(
+                shape=cube.shape[1:],
+                bounds=(cube.xt_min_index, cube.yt_min_index, cube.zt_min_index),
+            ),
+            pos=pos,
+            satellite=satellite,
+            zoom=zoom,
+            speed=speed,
+            fov=fov,
+            up=up,
+        )
+        return camera
+
+    def _animation(self) -> None:
         """
         Creates the 3D animation using k3d. 
         """
-
-        # * also used [0x0000ff] as color_map
-
-        # DISPLAY setup
-        self.plot = k3d.plot(grid_visible=self.visible_grid)  # black: background_color=0x000000 #type:ignore
-        self.plot.height = self.plot_height  
-
-        # CAMERA params
-        self.camera_params()
 
         # DEFAULT params
         kwargs = {
@@ -761,59 +768,25 @@ class K3dAnimation(Setup):
                 resolution=self.texture_resolution,
                 grid=15.,
             )
-            self.plot += sun.points(compression_lvl=self.compression_level)
-
-        if self._choices['test points']:
-            cube = self.find_first_cube()
-            if cube is not None:
-                point = k3d.points(
-                    positions=np.array([
-                        cube.xt_min_index,
-                        cube.yt_min_index,
-                        cube.zt_min_index
-                    ], dtype='float32'),
-                    point_size=5,
-                    colors=[0xff0000],
-                    shader='3d',
-                    name='BORDERs',
-                )
-                point2 = k3d.points(
-                    positions=np.array([
-                        cube.xt_min_index + 62,
-                        cube.yt_min_index + 65,
-                        cube.zt_min_index + 150,
-                    ], dtype='float32'),
-                    point_size=5,
-                    colors=[0xff0000],
-                    shader='3d',
-                    name='BORDERs2',
-                )
-                self.plot += point
-                self.plot += point2
-
-        # TEST CUBE add
-        if self._cubes.test_cube is not None:
-            # VOXELs create
-            self.plot_test_cube = self.create_voxels(self._cubes.test_cube, **kwargs)
-            for plot in self.plot_test_cube: self.plot += plot
+            self._plot += sun.points(compression_lvl=self.compression_level)
 
         # ALL DATA add
         if self._cubes.all_data is not None:
             # VOXELS create
             self.plot_alldata = self.create_voxels(self._cubes.all_data, **kwargs)
-            for plot in self.plot_alldata: self.plot += plot     
+            for plot in self.plot_alldata: self._plot += plot     
 
         # NO DUPLICATES add
         if self._cubes.no_duplicate is not None:
             # VOXELs create
             self.plot_dupli_new = self.create_voxels(self._cubes.no_duplicate, **kwargs)
-            for plot in self.plot_dupli_new: self.plot += plot
+            for plot in self.plot_dupli_new: self._plot += plot
 
         # TIME INTEGRATION add
         if self._cubes.integration_all_data is not None:
             # VOXELs create
             self.plot_interv_new = self.create_voxels(self._cubes.integration_all_data, **kwargs)
-            for plot in self.plot_interv_new: self.plot += plot
+            for plot in self.plot_interv_new: self._plot += plot
 
         # TIME NO DUPLICATES add
         if self._cubes.integration_no_duplicate is not None:
@@ -822,7 +795,7 @@ class K3dAnimation(Setup):
                 self._cubes.integration_no_duplicate,
                 **kwargs,
             )
-            for plot in self.plot_interv_dupli_new: self.plot += plot  
+            for plot in self.plot_interv_dupli_new: self._plot += plot  
 
         # FULL INTEGRATION add
         if self._cubes.full_integration_all_data is not None:
@@ -831,7 +804,7 @@ class K3dAnimation(Setup):
                 self._cubes.full_integration_all_data,
                 **kwargs,
             )
-            for plot in self.plot_full_alldata: self.plot += plot
+            for plot in self.plot_full_alldata: self._plot += plot
 
         # FULL NO DUPLICATES add
         if self._cubes.full_integration_no_duplicate is not None:
@@ -840,19 +813,19 @@ class K3dAnimation(Setup):
                 self._cubes.full_integration_no_duplicate,
                 **kwargs,
             )
-            for plot in self.plot_full_no_duplicate: self.plot += plot
+            for plot in self.plot_full_no_duplicate: self._plot += plot
 
         # SDO LINE OF SIGHT add
         if self._cubes.los_sdo is not None:
             # VOXELs create
             self.plot_los_sdo = self.create_voxels(self._cubes.los_sdo, **kwargs)
-            for plot in self.plot_los_sdo: self.plot += plot
+            for plot in self.plot_los_sdo: self._plot += plot
 
         # STEREO LINE OF SIGHT add
         if self._cubes.los_stereo is not None:
             # VOXELs create
             self.plot_los_stereo = self.create_voxels(self._cubes.los_stereo, **kwargs)
-            for plot in self.plot_los_stereo: self.plot += plot
+            for plot in self.plot_los_stereo: self._plot += plot
 
         # BUTTON play/pause
         self.play_pause_button = ipywidgets.ToggleButton(
@@ -880,7 +853,7 @@ class K3dAnimation(Setup):
 
         # DISPLAY
         IPython.display.display(
-            self.plot,
+            self._plot,
             self.time_slider,
             self.date_dropdown,
             self.play_pause_button,
@@ -943,31 +916,6 @@ class K3dAnimation(Setup):
                 )
         return plots
 
-    def get_camera_reference(self) -> np.ndarray:
-        """
-        Gets the camera reference point.
-
-        Returns:
-            np.ndarray: the camera reference point.
-        """
-
-        # REFERENCE point
-        cube = self.find_first_cube()
-
-        if cube is not None:
-            data = cube[0]
-            reference = np.array(
-                object=[
-                    (data[0].shape[0] / 2) + cube.xt_min_index,
-                    (data[0].shape[1] / 2) + cube.yt_min_index,
-                    (data[0].shape[2] / 2) + cube.zt_min_index,
-                ],
-                dtype=np.float32,
-            )
-        else:
-            reference = np.array([0, 0, 0], dtype=np.float32)
-        return reference
-
     def find_first_cube(self) -> CubeInfo | None:
         """
         Finds the first cube that has data in it.
@@ -984,66 +932,6 @@ class K3dAnimation(Setup):
         # NO DATA
         return None
 
-    def camera_params(self) -> None:
-        """
-        Camera visualization parameters.
-        """
-        
-        # PARAMs constant
-        self.plot.camera_auto_fit = False
-        self.plot.camera_fov = self.camera_fov  # FOV in degrees
-        self.plot.camera_zoom_speed = self.camera_zoom_speed  # zooming too quickly (default=1.2)
-
-        self._camera_reference = self.get_camera_reference()
-
-        # POV stereo
-        if self._cubes.stereo_pos is not None:
-            self.plot.camera = [
-                self._cubes.stereo_pos[0, 0],
-                self._cubes.stereo_pos[0, 1],
-                self._cubes.stereo_pos[0, 2],
-                self._camera_reference[0],
-                self._camera_reference[1],
-                self._camera_reference[2],
-                self.up_vector[0],
-                self.up_vector[1],
-                self.up_vector[2],
-            ]
-        # POV sdo
-        elif self._cubes.sdo_pos is not None:
-            self.plot.camera = [
-                self._cubes.sdo_pos[0, 0],
-                self._cubes.sdo_pos[0, 1],
-                self._cubes.sdo_pos[0, 2],
-                self._camera_reference[0],
-                self._camera_reference[1],
-                self._camera_reference[2],
-                self.up_vector[0],
-                self.up_vector[1],
-                self.up_vector[2]
-            ]
-        else:
-            au_in_solar_r = 215  # 1 au in solar radii
-            distance_to_sun = au_in_solar_r * self._solar_r / self.constants.dx
-
-            if not self.camera_pos:
-                print("No 'camera_pos', setting default values.")
-                self.camera_pos = (- distance_to_sun, -0.5 * distance_to_sun, 0)
-
-            print(f'camera_pos: {self.camera_pos}')
-            print(f'_camera_reference: {self._camera_reference}')
-            self.plot.camera = [
-                self._camera_reference[0] + self.camera_pos[0], # ! there is an overflow here
-                self._camera_reference[1] + self.camera_pos[1],
-                self._camera_reference[2] + self.camera_pos[2],
-                self._camera_reference[0],
-                self._camera_reference[1],
-                self._camera_reference[2],
-                self.up_vector[0],
-                self.up_vector[1],
-                self.up_vector[2]
-            ] 
-
     def update_plot(self, change: dict[str, Any]) -> None:
         """
         Updates the voxels depending on which time value is chosen.
@@ -1053,35 +941,8 @@ class K3dAnimation(Setup):
                 'old' key being the old value.
         """
 
-        # POV stereo
-        if self._cubes.stereo_pos is not None:
-            self.plot.camera = [
-                self._cubes.stereo_pos[change['new'], 0],
-                self._cubes.stereo_pos[change['new'], 1],
-                self._cubes.stereo_pos[change['new'], 2],
-                self._camera_reference[0],
-                self._camera_reference[1],
-                self._camera_reference[2],
-                self.up_vector[0],
-                self.up_vector[1],
-                self.up_vector[2],
-            ]
-            time.sleep(0.2) 
-
-        # POV sdo
-        elif self._cubes.sdo_pos is not None:
-            self.plot.camera = [
-                self._cubes.sdo_pos[change['new'], 0],
-                self._cubes.sdo_pos[change['new'], 1],
-                self._cubes.sdo_pos[change['new'], 2],
-                self._camera_reference[0],
-                self._camera_reference[1],
-                self._camera_reference[2],
-                self.up_vector[0],
-                self.up_vector[1],
-                self.up_vector[2],
-            ]
-            time.sleep(0.2)
+        # CAMERA
+        self._camera.update(change['new'])
 
         # ALL DATA
         if self._cubes.all_data is not None:
@@ -1141,7 +1002,6 @@ class K3dAnimation(Setup):
         if self.play_pause_button.value and self.time_slider.value < len(self.constants.dates) - 1:
             self.time_slider.value += 1
             threading.Timer(self.sleep_time, self.play).start()
-            # where you also set the sleep() time.
 
         else:
             self.play_pause_button.description = 'Play'

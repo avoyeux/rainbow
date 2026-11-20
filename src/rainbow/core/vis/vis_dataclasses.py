@@ -218,7 +218,7 @@ class UniqueCubeInfo(ParentInfo):
         cube = np.zeros(self.shape, dtype='uint8')
         cube[tuple(self.dataset_coords)] = self.dataset_values[...]
         result = [cube]
-        
+
         # POLYNOMIALs
         if self.polynomials is not None:  # ! could be wrong as there is only one index here
             result += [polynomial[0] for polynomial in self.polynomials]
@@ -237,8 +237,8 @@ class CubesData:
     hdf5File: h5py.File
 
     # POS satellites
-    sdo_pos: np.ndarray[tuple[int], np.dtype[np.floating]] | None = field(default=None, init=False)
-    stereo_pos: np.ndarray[tuple[int], np.dtype[np.floating]] | None = field(
+    sdo_pos: np.ndarray[tuple[int], np.dtype[np.float32]] | None = field(default=None, init=False)
+    stereo_pos: np.ndarray[tuple[int], np.dtype[np.float32]] | None = field(
         default=None,
         init=False,
     )
