@@ -2,7 +2,6 @@
 To 3D visualize the rainbow filament data and the corresponding polynomial fitting.
 """
 from __future__ import annotations
-from toolz import comp
 
 # IMPORTs standard
 import os
@@ -17,7 +16,6 @@ import IPython
 import typeguard
 import ipywidgets
 import numpy as np
-from astropy.io import fits
 from matplotlib import colors as mcolors
 
 # IMPORTs personal
@@ -26,7 +24,7 @@ from common import Decorators, Plot
 # IMPORTs local
 from rainbow.config import config
 from .sun import Sun
-from .camera import Camera, CubeInfo as CameraInfo
+from .camera import Camera, Info as CameraInfo
 from .vis_dataclasses import (
     CubesData, CubesConstants, CubeInfo, UniqueCubeInfo,
     PolynomialData, UniquePolynomialData,
@@ -46,7 +44,7 @@ __all__ = ['K3dAnimation']
 
 # todo need to improve the names of the different datasets in the visualization
 # todo need to be able to add the extended version of the polynomial fit
-# todo when using STEREO POV, need to set the camera fov properly (not centered right now and too large)
+
 
 
 class Setup:
@@ -732,11 +730,14 @@ class K3dAnimation(Setup):
             distance_to_sun = au_in_solar_r * self._solar_r / self.constants.dx
             print("No 'camera_pos', setting default values.")
             pos = (- distance_to_sun, -0.5 * distance_to_sun, 0)
+            pos = np.array([pos for _ in range(len(self.constants.dates))], dtype=np.float32)
 
         cube: CubeInfo = self.find_first_cube()  #type:ignore
         camera = Camera(
             plot=self._plot,
-            cube=CameraInfo(
+            info=CameraInfo(
+                dx=self.constants.dx,
+                solar_r=self._solar_r,
                 shape=cube.shape[1:],
                 bounds=(cube.xt_min_index, cube.yt_min_index, cube.zt_min_index),
             ),

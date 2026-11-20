@@ -23,16 +23,18 @@ if TYPE_CHECKING:
     from k3d.plot import Plot
 
 # API public
-__all__ = ['Camera', 'CubeInfo']
+__all__ = ['Camera', 'Info']
 
 
 
 @dataclass(slots=True, repr=False, eq=False, match_args=False)
-class CubeInfo:
+class Info:
     """
     Single data cube information.
     """
 
+    dx: float
+    solar_r: float
     shape: tuple[int, int, int]
     bounds: tuple[float, float, float]
 
@@ -45,8 +47,8 @@ class Camera:
     def __init__(
             self,
             plot: Plot,
-            cube: CubeInfo,
-            pos: tuple[float, float, float] | npt.NDArray[np.float32],
+            info: Info,
+            pos: npt.NDArray[np.float32],
             satellite: Literal['sdo', 'stereo'] | None = None,
             zoom: float = 3,
             speed: float = .7,
@@ -55,20 +57,23 @@ class Camera:
             sleep: float = 0.2,
         ) -> None:
         # todo add docstring
+        # ! need to add the distance to the satellite.
 
         # ARGs
+        self._fov = fov
         self._plot = plot
         self._zoom = zoom
         self._pos = pos
         self._speed = speed
         self._up = up
         self._sleep = sleep
+        self._info = info
+        self._satellite = satellite
 
         # RUN
-        self._fov = self._get_fov(satellite) if satellite is not None else fov
         self._ref = tuple(
             bound + shape / 2
-            for bound, shape in zip(cube.bounds, cube.shape)
+            for bound, shape in zip(info.bounds, info.shape)
         )
         self._setup()
 
@@ -81,49 +86,59 @@ class Camera:
                 The index of the position to use.
         """
 
-        # CAMERA pos and view
-        if not isinstance(self._pos, tuple):
-            camera: list[float] = [
-                *tuple(float(pos) for pos in self._pos[index]),
-                *self._ref,
-                *self._up,
-            ]
-            self._plot.camera = camera
-            time.sleep(self._sleep)
-        elif index==0:
-            camera: list[float] = [
-                *tuple(ref + pos for ref, pos in zip(self._ref, self._pos)),
-                *self._ref,
-                *self._up, 
-            ] #type:ignore
-            self._plot.camera = camera
+        # FOV
+        self._plot.camera_fov = self._get_fov(index)
 
-    def _get_fov(self, satellite: Literal['sdo', 'stereo']) -> float:
+        # CAMERA pos and view
+        camera: list[float] = [
+            *tuple(float(pos) for pos in self._pos[index]),
+            *self._ref,
+            *self._up,
+        ]
+        self._plot.camera = camera
+        time.sleep(self._sleep)
+
+    def _get_fov(self, index: int) -> float:
         """
         Gets the field of view of the camera for a given satellite.
 
         Args:
-            satellite -- Literal['sdo', 'stereo'].
-                The satellite to use for the FOV.
+            index -- int.
+                The index of the position to use.
 
         Returns:
             float.
                 The field of view of the camera.
         """
 
-        if satellite == 'sdo': return self._sdo_fov()
-        return self._stereo_fov()
+        if self._satellite is None: return self._fov
+        if self._satellite == 'sdo': return self._sdo_fov()
+        return self._stereo_fov(index)
 
-    def _stereo_fov(self) -> float:
+    def _stereo_fov(self, index: int) -> float:
         """
-        ! wrong. NEED fov degrees not carrington ones.
         Gets the field of view of STEREO.
+
+        Args:
+            index -- int.
+                The index of the position to use.
 
         Returns:
             float.
                 The field of view of STEREO.
         """
-        return 1.
+        pos = self._pos[index]
+        print(f'solar r is {self._info.solar_r}', flush=True)
+
+        d_sun: float = np.sqrt(np.dot(pos, pos))
+        print(f'd_sun is {d_sun}', flush=True)
+
+        carrington_fov = np.deg2rad(45)
+
+        sun = self._info.solar_r / self._info.dx * np.tan(carrington_fov / 2)
+        fov = 2 * np.arctan(sun / d_sun)
+        print(f'fov is {fov}', flush=True)
+        return np.rad2deg(fov)
 
     def _sdo_fov(self) -> float:
         """
@@ -150,7 +165,6 @@ class Camera:
 
         # PARAMs constant
         self._plot.camera_auto_fit = False
-        self._plot.camera_fov = self._fov  # FOV in degrees
         self._plot.camera_zoom_speed = self._speed  # zoom speed (default=1.2)
 
         # UPDATE
