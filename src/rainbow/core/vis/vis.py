@@ -29,6 +29,7 @@ from .vis_dataclasses import (
     CubesData, CubesConstants, CubeInfo, UniqueCubeInfo,
     PolynomialData, UniquePolynomialData,
 )
+from .screenshot import Screenshot
 
 # TYPE ANNOTATIONs
 from typing import TYPE_CHECKING, Any, overload, Literal, cast
@@ -212,7 +213,7 @@ class Setup:
                 HDF5File=HDF5File,
                 group_path=path,
                 colour='orange',
-                opacity=0.2,
+                opacity=0.3,
             )
 
         if self._choices['no duplicate full integration']:
@@ -234,7 +235,7 @@ class Setup:
                 HDF5File=HDF5File,
                 group_path=path,
                 colour='green',
-                opacity=0.1,
+                opacity=0.02,
                 interpolate=False,
             )
 
@@ -634,8 +635,7 @@ class K3dAnimation(Setup):
     def __init__(
             self,
             compression_level: int = 9,
-            plot_height: int = 1260, 
-            sleep_time: int | float = 2, 
+            sleep_time: int | float = 1, 
             camera_zoom_speed: int | float = 0.7, 
             camera_pos: tuple[float, float, float] | None = None,
             camera_fov: float = 0.23,
@@ -643,6 +643,9 @@ class K3dAnimation(Setup):
             visible_grid: bool = False, 
             outlines: bool = False,
             texture_resolution: int = 960,  
+            offscreen: bool = False,
+            width: int = 1920,
+            height: int = 1080,
             **kwargs,
         ) -> None:
         """
@@ -671,6 +674,8 @@ class K3dAnimation(Setup):
                 Defaults to False.
             texture_resolution (int, optional): the resolution of the sun's texture, i.e. how many
                 points need to be displayed phi direction. Defaults to 960.
+            offscreen (bool, optional): deciding to render every frame to a PNG sequence with a
+                headless browser. Defaults to False.
             **kwargs: the other arguments to pass to the parent class.
         """
 
@@ -699,14 +704,20 @@ class K3dAnimation(Setup):
 
         # RUN
         self._plot: Any = k3d.plot(grid_visible=visible_grid)  # black: background_color=0x000000 #type:ignore
-        self._plot.height = plot_height
+        self._plot.height = height
+        # self._plot.width = width
+
         self._camera = self._get_camera(
             zoom=camera_zoom_speed,
             speed=camera_zoom_speed,
             fov=camera_fov,
             up=up_vector,
+            default_pos=camera_pos,
         )
         self._animation()
+
+        # OFFSCREEN
+        if offscreen: self._save_offscreen(width, height)
 
     def _get_camera(
             self,
@@ -714,6 +725,7 @@ class K3dAnimation(Setup):
             speed: float,
             fov: float,
             up: tuple[int, int, int],
+            default_pos: tuple[float, float, float] | None,
         ) -> Camera:
         # todo add docstring
 
@@ -726,13 +738,21 @@ class K3dAnimation(Setup):
             pos = self._cubes.stereo_pos
         else:
             satellite = None
-            au_in_solar_r = 215  # 1 au in solar radii
-            distance_to_sun = au_in_solar_r * self._solar_r / self.constants.dx
-            print("No 'camera_pos', setting default values.")
-            pos = (- distance_to_sun, -0.5 * distance_to_sun, 0)
-            pos = np.array([pos for _ in range(len(self.constants.dates))], dtype=np.float32)
+            if default_pos is not None:
+                position = default_pos
+            else:
+                au_in_solar_r = 215  # 1 au in solar radii
+                distance_to_sun = au_in_solar_r * self._solar_r / self.constants.dx
+                print("No 'camera_pos', setting default values.")
+                position = (- distance_to_sun, -0.5 * distance_to_sun, 0)
 
-        cube: CubeInfo = self.find_first_cube()  #type:ignore
+            pos = np.array(
+                object=[position for _ in range(len(self.constants.dates))],
+                dtype=np.float32,
+            )
+
+        cube: CubeInfo = self.find_first_cube()  #type:ignore # todo change this weird patch
+        # CAMERA
         camera = Camera(
             plot=self._plot,
             info=CameraInfo(
@@ -993,7 +1013,6 @@ class K3dAnimation(Setup):
         # PLOTs add data
         for i, plot in enumerate(plots):
             plot.voxels = cubes[i].transpose((2, 1, 0))
-            print(f"{index} - {cubes[i].sum()} voxels", flush=True)
 
     def play(self) -> None:
         """
@@ -1020,3 +1039,41 @@ class K3dAnimation(Setup):
             self.play()
             self.play_pause_button.description = 'Pause'
             self.play_pause_button.icon = 'pause'
+
+    def _save_offscreen(
+            self,
+            width: int,
+            height: int,
+        ) -> None:
+        """
+        Renders every frame to a PNG sequence with a headless browser.
+
+        Args:
+            width -- int
+                Browser width in pixels. Defaults to 1920.
+            height -- int
+                Browser height in pixels. Defaults to 1080.
+        """
+
+        if self._verbose > 0:
+            print("Saving frames...", flush=self._flush)
+
+        # RENDERER headless
+        with Screenshot(self._plot, width=width, height=height) as screenshots:
+            # CUBEs loop
+            for index in range(len(self.constants.dates)):
+                # UPDATE
+                self.update_plot({'new': index})
+
+                # SAVE
+                path = screenshots.save(
+                    name=f'frame_{index:04d}.png',
+                    sync=True,
+                )
+
+                # PRINT
+                if self._verbose > 1:
+                    print(f"{index:04d} -- SAVED {os.path.basename(path)}", flush=self._flush)
+
+        if self._verbose > 0:
+            print("All frames saved", flush=self._flush)

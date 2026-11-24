@@ -5,15 +5,16 @@ polynomial_order:
 choices: 
   # - 'all dates'
   - 'sun'
-  - 'all data'
+  # - 'all data'
   # - 'all data integration'
   - 'no duplicate'
   - 'no duplicate integration'
   - 'line of sight sdo'
-  - 'line of sight stereo'
   - 'pov sdo'
+width: 1080
+height: 1080
 
 # CONFIG
 compression_level: 9
-verbose: 0
-flush: false
+verbose: 10
+flush: true

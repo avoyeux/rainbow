@@ -76,7 +76,7 @@ class Sun:
 
         points = k3d.points(
             positions=self._positions,
-            point_size=3.,
+            point_size=5.,
             colors=self._get_colors(),
             shader=shader,
             name='SUN',

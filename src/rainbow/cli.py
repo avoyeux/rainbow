@@ -116,11 +116,14 @@ def project() -> None:
 @Decorators.running_time
 def vis() -> None:
     """
-    Function to use in jupyter-notebook to visualize the data cube in 3D.
+    Function to save the 3D visualization png figures.
     """
 
     print('\033[90mStarting 3D visualization...\033[0m', flush=True)
     params = default_args('3D visualization.', config.file.vis)
+
+    # UPDATE
+    params['offscreen'] = True
 
     # RUN
     K3dAnimation(**params)

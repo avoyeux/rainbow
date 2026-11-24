@@ -32,7 +32,7 @@ class Info:
     """
     Single data cube information.
     """
-
+    # todo take it completely away when sure that only (195, 0) is used as ref.
     dx: float
     solar_r: float
     shape: tuple[int, int, int]
@@ -54,10 +54,32 @@ class Camera:
             speed: float = .7,
             fov: float = 0.23,
             up: tuple[int, int, int] = (0, 0, 1),
-            sleep: float = 0.2,
+            sleep: float = 0.01,
         ) -> None:
-        # todo add docstring
-        # ! need to add the distance to the satellite.
+        """
+        Sets up the camera field of view and positioning.
+        Use the 'update' method to update the camera position.
+
+        Arguments:
+            plot -- Plot
+                The plot object to use.
+            info -- Info
+                The information of the data cube.
+            pos -- npt.NDArray[np.float32]
+                The positions of the camera.
+            satellite -- Literal['sdo', 'stereo'] | None (default: None)
+                The satellite to use.
+            zoom -- float (default: 3)
+                The zoom of the camera.
+            speed -- float (default: .7)
+                The speed of the camera.
+            fov -- float (default: 0.23)
+                The field of view of the camera.
+            up -- tuple[int, int, int] (default: (0, 0, 1))
+                The up vector of the camera.
+            sleep -- float (default: 0.01)
+                The sleep time between updates.
+        """
 
         # ARGs
         self._fov = fov
@@ -71,10 +93,11 @@ class Camera:
         self._satellite = satellite
 
         # RUN
-        self._ref = tuple(
-            bound + shape / 2
-            for bound, shape in zip(info.bounds, info.shape)
-        )
+        self._ref = self._get_ref()
+        # self._ref = tuple(
+        #     bound + shape / 2
+        #     for bound, shape in zip(info.bounds, info.shape)
+        # )
         self._setup()
 
     def update(self, index: int) -> None:
@@ -82,7 +105,7 @@ class Camera:
         Updates the camera position.
 
         Args:
-            index -- int.
+            index -- int
                 The index of the position to use.
         """
 
@@ -98,16 +121,34 @@ class Camera:
         self._plot.camera = camera
         time.sleep(self._sleep)
 
+    def _get_ref(self) -> tuple[float, float, float]:
+        """
+        Gives the reference position of the camera.
+
+        Returns:
+            tuple[float, float, float]
+                The reference position of the camera.
+        """
+
+        center = np.deg2rad((195., 0.))  # lon, lat
+        r = self._info.solar_r / self._info.dx  # radius
+        ref = (
+            r * np.cos(center[1]) * np.cos(center[0]),
+            r * np.cos(center[1]) * np.sin(center[0]),
+            r * np.sin(center[1]),
+        )
+        return ref
+
     def _get_fov(self, index: int) -> float:
         """
         Gets the field of view of the camera for a given satellite.
 
         Args:
-            index -- int.
+            index -- int
                 The index of the position to use.
 
         Returns:
-            float.
+            float
                 The field of view of the camera.
         """
 
@@ -120,24 +161,19 @@ class Camera:
         Gets the field of view of STEREO.
 
         Args:
-            index -- int.
+            index -- int
                 The index of the position to use.
 
         Returns:
-            float.
+            float
                 The field of view of STEREO.
         """
         pos = self._pos[index]
-        print(f'solar r is {self._info.solar_r}', flush=True)
-
         d_sun: float = np.sqrt(np.dot(pos, pos))
-        print(f'd_sun is {d_sun}', flush=True)
-
         carrington_fov = np.deg2rad(45)
 
         sun = self._info.solar_r / self._info.dx * np.tan(carrington_fov / 2)
         fov = 2 * np.arctan(sun / d_sun)
-        print(f'fov is {fov}', flush=True)
         return np.rad2deg(fov)
 
     def _sdo_fov(self) -> float:
@@ -145,7 +181,7 @@ class Camera:
         Gets the field of view of SDO.
 
         Returns:
-            float.
+            float
                 The field of view of SDO.
         """
 
