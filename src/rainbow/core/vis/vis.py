@@ -244,8 +244,8 @@ class Setup:
             cubes.los_stereo = self.get_cube_info(
                 HDF5File=HDF5File,
                 group_path=path,
-                colour='orange',
-                opacity=0.1,
+                colour='blue',
+                opacity=0.02,
                 interpolate=False,
             )
 
@@ -705,7 +705,8 @@ class K3dAnimation(Setup):
         # RUN
         self._plot: Any = k3d.plot(grid_visible=visible_grid)  # black: background_color=0x000000 #type:ignore
         self._plot.height = height
-        # self._plot.width = width
+        self._plot.axes_helper = 500
+        self._plot.axes = ['x', 'y', 'z']
 
         self._camera = self._get_camera(
             zoom=camera_zoom_speed,
@@ -1059,7 +1060,14 @@ class K3dAnimation(Setup):
             print("Saving frames...", flush=self._flush)
 
         # RENDERER headless
-        with Screenshot(self._plot, width=width, height=height) as screenshots:
+        with Screenshot(
+            plot=self._plot,
+            width=width,
+            height=height,
+            only_canvas=False,
+            axes_helper_pos=(0.05, 0.05),
+            ) as screenshots:
+
             # CUBEs loop
             for index in range(len(self.constants.dates)):
                 # UPDATE

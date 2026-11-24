@@ -5,11 +5,13 @@ from __future__ import annotations
 
 # IMPORTs standard
 import os
+import time
 
 # IMPORTs third-party
 from k3d.headless import get_headless_driver, k3d_remote
 
 # IMPORTs local
+from .js_patch import JSPatch
 from rainbow.config import config
 
 # TYPE ANNOTATIONS
@@ -53,6 +55,7 @@ class Screenshot:
             only_canvas: bool = True,
             extra_args: list[str] | None = None,
             driver: Any = None,
+            axes_helper_pos: tuple[float, float] | None = None,
         ) -> None:
         """
         Captures PNG frames of a ``k3d.plot`` with a headless browser.
@@ -75,6 +78,10 @@ class Screenshot:
                 this module needs, e.g. ``['--enable-precise-memory-info']``. Defaults to None.
             driver -- Any | None (default: None)
                 The pre-built Selenium driver to use instead of creating one.
+            axes_helper_pos -- tuple[float, float] | None (default: None)
+                Where to place the orientation triad in the saved image, as the fraction
+                ``(x, y)`` of the image, measured from its bottom-left corner. None keeps k3d
+                defaults.
         """
 
         # ARGs
@@ -84,8 +91,10 @@ class Screenshot:
         self._only_canvas = only_canvas
         self._extra_args = extra_args
         self._driver = driver
+        self._axes_helper_pos = axes_helper_pos
         self._remote: k3d_remote = None  #type:ignore
         self._dir = config.dir.output.k3d
+        self._primed = False
 
     def __enter__(self) -> Self:
         """
@@ -108,6 +117,20 @@ class Screenshot:
             width=self._width,
             height=self._height,
         )
+
+        # MOVE the orientation triad
+        if self._axes_helper_pos is not None:
+            self._wait_for_instance()
+
+            # AXES label size
+            self._remote.browser.execute_script(JSPatch.label_size()) #type:ignore
+
+            # AXES pos
+            self._remote.browser.execute_script(  #type:ignore
+                JSPatch.axes_pos(),
+                float(self._axes_helper_pos[0]),
+                float(self._axes_helper_pos[1]),
+            )
         return self
 
     def __exit__(self, *exceptions: Any) -> None: self.close()
@@ -129,9 +152,14 @@ class Screenshot:
         # CHECK
         self._require_session()
 
-        # SAVE
+        # SYNC
         path = os.path.join(self._dir, name)
         if sync: self._sync()
+
+        # AXES label pos
+        if self._axes_helper_pos is not None and not self._primed: self._prime_axes_delta()
+
+        # SAVE
         self._capture(path)
         return path
 
@@ -170,6 +198,35 @@ class Screenshot:
 
         png = self._remote.get_screenshot(only_canvas=self._only_canvas)
         with open(path, 'wb') as file: file.write(png)
+
+    def _wait_for_instance(self, timeout: float = 30.0) -> None:
+        """
+        Blocks until k3d's ``K3DInstance`` exists in the page.
+
+        Args:
+            timeout -- float (default: 30.0)
+                How long to wait before giving up.
+
+        Raises:
+            TimeoutError: If ``K3DInstance`` never appears.
+        """
+
+        deadline = time.monotonic() + timeout
+        while not self._remote.browser.execute_script(JSPatch.check_k3d()):  #type:ignore
+            if time.monotonic() > deadline:
+                raise TimeoutError(
+                    "k3d's K3DInstance was not created in the page within %g s." % timeout
+                )
+            time.sleep(0.1)
+
+    def _prime_axes_delta(self) -> None:
+        """
+        Recomputes the triad label shift from a render, once the plot is synced.
+        ``execute_script`` waits for the returned promise, so the shift is in place on return.
+        """
+
+        self._remote.browser.execute_script(JSPatch.label_sync())  #type:ignore
+        self._primed = True
 
     def _require_session(self) -> None:
         """
