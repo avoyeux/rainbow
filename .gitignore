@@ -22,6 +22,10 @@
 !data/**/
 !data/**/*.txt
 
+# BLACKLIST temp data files
+data/temp/
+data/temp/**
+
 # BLACKLIST cache
 **/__pycache__/
 **/*.egg-info/
