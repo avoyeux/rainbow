@@ -1,10 +1,10 @@
 # KEYWORD ARGUMENTs for the 'video' command.
-video_name: 'test.mp4'
-png_dir: &dir '/home/alfi/Codes/work/rainbow/data/output/k3d/'
-output_dir: *dir
+video_name: 'sparse.mp4'
+png_dir: &dir '/home/alfi/Codes/work/rainbow/data/output/k3d/fig/sparse/'
+output_dir: '/home/alfi/Codes/work/rainbow/data/output/k3d/vid/'
 fps: 6
-crf: 14
-png_pattern: 'frame_%04d.png'
+crf: 12
+png_pattern: 'fig%04d.png'
 extra_args:  # making sure that the number of pixels is even
   - '-vf'
   - 'pad=ceil(iw/2)*2:ceil(ih/2)*2'

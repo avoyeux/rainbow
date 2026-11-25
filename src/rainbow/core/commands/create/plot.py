@@ -39,9 +39,9 @@ class StereoPos:
         Creates a plot to visually see if the fit of the STEREO positions is correct.
 
         Arguments:
-            dates -- list[datetime.datetime].
+            dates -- list[datetime.datetime]
                 The dates of the positions.
-            positions -- npt.NDArray[np.float32].
+            positions -- npt.NDArray[np.float32]
                 The positions of STEREO.
         """
 

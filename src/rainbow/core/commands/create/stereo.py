@@ -53,11 +53,11 @@ class Stereo:
         To get the corresponding positions, use the 'positions' property.
 
         Arguments:
-            dates -- list[datetime.datetime].
+            dates -- list[datetime.datetime]
                 The dates for which the stereo position is needed.
-            processes -- int. Default = 1.
+            processes -- int (default: 1)
                 The number of processes to use to get the positions.
-            plot -- bool. Default = False.
+            plot -- bool (default: False)
                 Whether to plot the positions to visualize the goodness of fit.
         """
 
@@ -78,7 +78,7 @@ class Stereo:
     def positions(self) -> npt.NDArray[np.float32]:
         """
         Returns:
-            npt.NDArray[np.float32]:
+            npt.NDArray[np.float32]
                 The positions in Cartesian coordinates in the Carrington reference frame. The shape
                 of the array is (N, 3) where N represents the date indexes.
         """
@@ -91,10 +91,12 @@ class Stereo:
         YYYY/MM/DD hh:mm:ss.
 
         Args:
-            date (str | bytes): the date to parse.
+            date -- str | bytes
+                The date to parse.
 
         Returns:
-            datetime.datetime: the parsed date.
+            datetime.datetime
+                The parsed date.
         """
 
         if isinstance(date, bytes): date = date.decode()
@@ -109,7 +111,7 @@ class Stereo:
         spline fitted on the known (date, position) points.
 
         Returns:
-            npt.NDArray[np.float32]:
+            npt.NDArray[np.float32]
                 The positions in Cartesian coordinates in the Carrington reference frame.
         """
 
@@ -153,7 +155,7 @@ class Stereo:
         Uses multiprocessing if asked for.
 
         Returns:
-            list[tuple[datetime, npt.NDArray[np.float32]]]:
+            list[tuple[datetime, npt.NDArray[np.float32]]]
                 Ordered list of the dates and positions in Cartesian coordinates in the Carrington
                 reference frame.
         """
@@ -173,7 +175,7 @@ class Stereo:
         Multiprocessing the fetching of the date and satellite position.
 
         Returns:
-            list[tuple[datetime, npt.NDArray[np.float32]]]:
+            list[tuple[datetime, npt.NDArray[np.float32]]]
                 Ordered list of the dates and positions in Cartesian coordinates in the Carrington
                 reference frame.
         """
@@ -213,9 +215,9 @@ class Stereo:
         Runs the multiprocessing on a single process.
 
         Arguments:
-            counter -- CounterType[int].
+            counter -- CounterType[int]
                 The counter to track the index of the next file to process.
-            output_queue -- QueueType[tuple[int, datetime, npt.NDArray[np.float32]]].
+            output_queue -- QueueType[tuple[int, datetime, npt.NDArray[np.float32]]]
                 The queue to store the index, date and position.
         """
 
@@ -242,11 +244,11 @@ class Stereo:
         Carrington reference frame.
 
         Arguments:
-            info -- np.recarray.
+            info -- np.recarray
                 The STEREO information for at a single time.
 
         Returns:
-            tuple[datetime, npt.NDArray[np.float32]].
+            tuple[datetime, npt.NDArray[np.float32]]
                 The date and the position in Cartesian coordinates in the Carrington reference
                 frame.
         """

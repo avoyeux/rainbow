@@ -164,8 +164,8 @@ class Setup:
             cubes.all_data = self.get_cube_info(
                 HDF5File=HDF5File,
                 group_path=path,
-                colour='brown',
-                opacity=0.3,
+                colour='grey',
+                opacity=0.4,
                 interpolate=False,
             )
 

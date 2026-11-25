@@ -33,7 +33,9 @@ __all__ = ['Plot']
 
 
 class Plot:
-    # todo add docstring
+    """
+    To create the 3*3 contour figure.
+    """
 
     # ? keep the constants here or in another class ?
     _lon_cen: float = 195.
@@ -61,7 +63,34 @@ class Plot:
             verbose: int = 0,
             flush: bool = False,
         ) -> None:
-        # todo add docstring
+        """
+        Creates the 3*3 contour figure.
+
+        Arguments:
+            number -- int
+                The number of the figure.
+            stereo_171 -- Data
+                The 171nm data.
+            stereo_304 -- Data
+                The 304nm data.
+            sdo_304 -- Data
+                The SDO data.
+            grid_ticks -- float (default: 15.)
+                The spacing in Carrington degrees of the grid added to each image.
+            grid_kwargs -- dict (default: {
+                'color': 'white',
+                'linestyle': '--',
+                'linewidth': 0.08,
+                'alpha': 0.4,
+            })
+                The kwargs for the grid added to each image.
+            same_fov -- bool (default: True)
+                Whether to use the same fov for all the images.
+            verbose -- int (default: 0)
+                The verbosity for the prints.
+            flush -- bool (default: False)
+                Wether to flush the prints.
+        """
 
         # DATA
         self._stereo_171 = stereo_171
@@ -85,8 +114,14 @@ class Plot:
 
     @property
     def _dpi(self) -> int:
-        # todo add docstring
-        # todo need to find a way to get the final size of the sdo image being used.
+        """
+        Returns the DPI of the figure. Its the minimum DPI required so that each input pixel as at
+        least 1 pixel in the figure.
+
+        Returns:
+            int.
+                The DPI of the figure.
+        """
 
         # # SHAPE max final size
         row = int(
@@ -199,7 +234,8 @@ class Plot:
             bbox_inches='tight',
             pad_inches=0.,
             dpi=self._dpi,
-        )  # todo change to pdf for the scientific paper
+        )
+        fig.clear()
         plt.close()
 
     def _add_sdo_plot(
@@ -210,7 +246,21 @@ class Plot:
             data: npt.NDArray[np.float64],
             mask: npt.NDArray[np.bool_] | None,
         ) -> None:
-        # todo add docstring
+        """
+        Adds an SDO image to the figure.
+
+        Arguments:
+            fig -- plt.Figure
+                The figure to add the image to.
+            grid -- plt.GridSpec
+                The grid to add the image to.
+            plot_pos -- tuple[int, int]
+                The position in the grid to add the image to.
+            data -- npt.NDArray[np.float64]
+                The SDO image to add to the figure.
+            mask -- npt.NDArray[np.bool_] | None
+                The mask for which the contour is added to the image. If None, no contour is added.
+        """
 
         # MAP for grid and zoom
         sdo_map = sunpy.map.Map(data, self._sdo_304.header)
@@ -254,7 +304,7 @@ class Plot:
             coord.set_ticklabel_visible(False)
         ax.grid(False)
 
-    def _add_stereo_plot(  # ! could be also for 171 if same image lon lat
+    def _add_stereo_plot(
             self,
             fig: plt.Figure,
             grid: plt.GridSpec,
@@ -263,7 +313,23 @@ class Plot:
             mask: npt.NDArray[np.bool_] | None,
             add_grid_label: bool = False,
         ) -> None:
-        # todo add docstring
+        """
+        Adds a STEREO image to the figure.
+
+        Arguments:
+            fig -- plt.Figure
+                The figure to add the image to.
+            grid -- plt.GridSpec
+                The grid to add the image to.
+            plot_pos -- tuple[int, int]
+                The position in the grid to add the image to.
+            image -- npt.NDArray[np.float64]
+                The image to add to the figure.
+            mask -- npt.NDArray[np.bool_] | None
+                The mask to add to the image.
+            add_grid_label -- bool (default: False)
+                Whether to add the grid label to the image.
+        """
 
         # ADD
         ax = fig.add_subplot(grid[plot_pos])
@@ -279,7 +345,18 @@ class Plot:
         self._add_grid_stereo(ax, add_grid_label)
 
     def _crop_sdo_304(self, sdo_map: sunpy.map.GenericMap) -> sunpy.map.GenericMap:
-        # todo add docstring
+        """
+        Crops the SDO image so that the field of view is a square with the same latitude range than
+        the STEREO field of view.
+
+        Arguments:
+            sdo_map -- sunpy.map.GenericMap
+                The SDO image to crop.
+
+        Returns:
+            sunpy.map.GenericMap
+                The cropped SDO image.
+        """
 
         # HELIOGRAPHIC CARRINGTON latitude
         half = self._lat_half_width * u.deg
@@ -313,9 +390,9 @@ class Plot:
         Adds the contours of a given mask in a given plot.
 
         Arguments:
-            ax -- plt.Axes.
+            ax -- plt.Axes
                 The axes to add the contours to.
-            mask -- npt.NDArray[np.bool_].
+            mask -- npt.NDArray[np.bool_]
                 The mask to add the contours of.
         """
 
@@ -327,7 +404,7 @@ class Plot:
         Adding the grid-lines and corresponding labels (if asked for) to a given plot.
 
         Arguments:
-            ax -- plt.Axes.
+            ax -- plt.Axes
                 The axes to add the grid-lines and labels to.
             add_label -- bool (default: False)
                 Whether to add the labels to the grid-lines.
@@ -384,17 +461,17 @@ class Plot:
         Computes and gives the grid-line positions and corresponding labels.
 
         Arguments:
-            dx -- float.
+            dx -- float
                 The pixel size in degrees.
-            cen -- float.
+            cen -- float
                 The center value of the image in degrees.
-            width -- float.
+            width -- float
                 The width of the image in degrees.
-            direction -- Literal['lon', 'lat'].
+            direction -- Literal['lon', 'lat']
                 The direction of the grid-line.
 
         Returns:
-            tuple[list[int], list[str]].
+            tuple[list[int], list[str]]
                 The grid-line positions (in pixels) and corresponding labels.
         """
 
