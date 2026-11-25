@@ -23,8 +23,8 @@
 !data/**/*.txt
 
 # BLACKLIST temp data files
-data/temp/
-data/temp/**
+data/tmp/
+data/tmp/**
 
 # BLACKLIST cache
 **/__pycache__/

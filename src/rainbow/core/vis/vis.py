@@ -25,7 +25,7 @@ from common import Decorators, Plot
 from rainbow.config import config
 from .sun import Sun
 from .camera import Camera, Info as CameraInfo
-from .vis_dataclasses import (
+from .dataclass import (
     CubesData, CubesConstants, CubeInfo, UniqueCubeInfo,
     PolynomialData, UniquePolynomialData,
 )
@@ -634,6 +634,7 @@ class K3dAnimation(Setup):
     @typeguard.typechecked
     def __init__(
             self,
+            name: str = '',
             compression_level: int = 9,
             sleep_time: int | float = 1, 
             camera_zoom_speed: int | float = 0.7, 
@@ -718,7 +719,7 @@ class K3dAnimation(Setup):
         self._animation()
 
         # OFFSCREEN
-        if offscreen: self._save_offscreen(width, height)
+        if offscreen: self._save_offscreen(name=name, width=width, height=height)
 
     def _get_camera(
             self,
@@ -1043,6 +1044,7 @@ class K3dAnimation(Setup):
 
     def _save_offscreen(
             self,
+            name: str,
             width: int,
             height: int,
         ) -> None:
@@ -1050,6 +1052,8 @@ class K3dAnimation(Setup):
         Renders every frame to a PNG sequence with a headless browser.
 
         Args:
+            name -- str
+                The start of the name of the output PNG files.
             width -- int
                 Browser width in pixels. Defaults to 1920.
             height -- int
@@ -1069,19 +1073,14 @@ class K3dAnimation(Setup):
             ) as screenshots:
 
             # CUBEs loop
-            for index in range(len(self.constants.dates)):
+            for i in range(len(self.constants.dates)):
                 # UPDATE
-                self.update_plot({'new': index})
+                self.update_plot({'new': i})
 
                 # SAVE
-                path = screenshots.save(
-                    name=f'frame_{index:04d}.png',
-                    sync=True,
-                )
+                screenshots.save(name=f'{name}{i:04d}.png', sync=True)
 
                 # PRINT
-                if self._verbose > 1:
-                    print(f"{index:04d} -- SAVED {os.path.basename(path)}", flush=self._flush)
+                if self._verbose > 1: print(f"{i:04d} -- SAVED PNG.", flush=self._flush)
 
-        if self._verbose > 0:
-            print("All frames saved", flush=self._flush)
+        if self._verbose > 0: print("All frames saved", flush=self._flush)
