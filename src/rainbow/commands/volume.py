@@ -5,7 +5,7 @@ STEREO and SDO.
 from __future__ import annotations
 
 # IMPORTs local
-from ..core.volume import Volume
+from rainbow.core.commands.volume import Volume
 
 # API public
 __all__ = ['Volume']

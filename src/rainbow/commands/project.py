@@ -12,11 +12,11 @@ import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
 # IMPORTs local
-from ..core.projection.format_data import (
+from rainbow.core.commands.project.format_data import (
     ProcessConstants, ProjectionData, ProjectedData, FitEnvelopes,
 )
-from ..core.projection.sdo_projection import OrthographicalProjection
-from ..core.projection.envelope_distance import EnvelopeDistanceAnnotation
+from rainbow.core.commands.project.sdo_projection import OrthographicalProjection
+from rainbow.core.commands.project.envelope_distance import EnvelopeDistanceAnnotation
 
 # TYPE ANNOTATIONs
 from typing import cast, Any

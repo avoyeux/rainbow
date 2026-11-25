@@ -59,7 +59,7 @@ class EnvelopeDistanceAnnotation:
         x = self.polar_r * np.cos(self.polar_theta)
         y = self.polar_r * np.sin(self.polar_theta)
         return np.stack([x, y], axis=0)
-    
+
     def get_curve_distance(self, coords: np.ndarray) -> np.ndarray:
         """
         To compute the distance along the curve given the cartesian coordinates.

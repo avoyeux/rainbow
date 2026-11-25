@@ -13,7 +13,7 @@ from __future__ import annotations
 import multiprocessing as mp
 
 # IMPORTs local
-from ..core.contour import Create, Stereo
+from rainbow.core.commands.contour import Create, Stereo
 
 # TYPE ANNOTATIONs
 from ..typing import CounterType

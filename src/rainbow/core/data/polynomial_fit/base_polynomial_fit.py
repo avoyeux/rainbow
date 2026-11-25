@@ -20,7 +20,7 @@ from common import Decorators
 
 # IMPORTs local
 from rainbow.config import config
-from ...miscellaneous.shared_memory import Shared
+from rainbow.core.misc.shared_memory import Shared
 
 # TYPE ANNOTATIONs
 from typing import Any, Callable, cast, Literal, TYPE_CHECKING

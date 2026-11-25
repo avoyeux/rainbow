@@ -1066,6 +1066,7 @@ class K3dAnimation(Setup):
         # RENDERER headless
         with Screenshot(
             plot=self._plot,
+            name=name,
             width=width,
             height=height,
             only_canvas=False,
@@ -1078,7 +1079,7 @@ class K3dAnimation(Setup):
                 self.update_plot({'new': i})
 
                 # SAVE
-                screenshots.save(name=f'{name}{i:04d}.png', sync=True)
+                screenshots.save(ID=f'{i:04d}', sync=True)
 
                 # PRINT
                 if self._verbose > 1: print(f"{i:04d} -- SAVED PNG.", flush=self._flush)

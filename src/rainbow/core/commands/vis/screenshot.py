@@ -50,6 +50,7 @@ class Screenshot:
     def __init__(
             self,
             plot: Plot,
+            name: str = '',
             width: int = 1920,
             height: int = 1080,
             only_canvas: bool = True,
@@ -64,6 +65,8 @@ class Screenshot:
         Args:
             plot -- k3d.plot.Plot
                 The plot to render.
+            name -- str (default: '')
+                The chosen name for the capture session.
             width -- int (default: 1920)
                 Browser width in pixels.
             height -- int (default: 1080)
@@ -93,8 +96,10 @@ class Screenshot:
         self._driver = driver
         self._axes_helper_pos = axes_helper_pos
         self._remote: k3d_remote = None  #type:ignore
-        self._dir = config.dir.output.k3d.frame
+        self._dir = os.path.join(config.dir.output.k3d.frame, name)
         self._primed = False
+
+        os.makedirs(self._dir, exist_ok=True)
 
     def __enter__(self) -> Self:
         """
@@ -135,13 +140,13 @@ class Screenshot:
 
     def __exit__(self, *exceptions: Any) -> None: self.close()
 
-    def save(self, name: str, sync: bool = True) -> str:
+    def save(self, ID: str, sync: bool = True) -> str:
         """
         Renders the current scene and saves it as a png.
 
         Args:
-            name -- str
-                The name of the png file.
+            ID -- str
+                The unique identifier of the frame. Used to name the file.
             sync -- bool (default: True)
                 Block until the render is complete. Keep True for frame-by-frame capture.
 
@@ -153,7 +158,7 @@ class Screenshot:
         self._require_session()
 
         # SYNC
-        path = os.path.join(self._dir, name)
+        path = os.path.join(self._dir, f'frame{ID}.png')
         if sync: self._sync()
 
         # AXES label pos

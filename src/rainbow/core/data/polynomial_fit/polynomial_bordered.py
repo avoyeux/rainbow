@@ -10,7 +10,7 @@ from __future__ import annotations
 import numpy as np
 
 # IMPORTs local
-from ...projection.format_data import CubeInformation
+from ...commands.project.format_data import CubeInformation
 from .base_polynomial_fit import GetPolynomialFit
 
 # TYPE ANNOTATIONs

@@ -4,7 +4,7 @@ Code to create the HDF5 files containing the cubes and their corresponding metad
 from __future__ import annotations
 
 # IMPORTs local
-from rainbow.core.create import Create
+from rainbow.core.commands.create import Create
 
 # API public
 __all__ = ['Create']

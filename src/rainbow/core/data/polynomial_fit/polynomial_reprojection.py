@@ -18,9 +18,9 @@ import matplotlib.pyplot as plt
 
 # IMPORTs local
 from rainbow.config import config
-from ...projection.format_data import FitWithEnvelopes, FitEnvelopes, EnvelopeInformation
-from ...projection.helpers.extract_envelope import CreateFitEnvelope
-from ...projection.helpers.base_reprojection import BaseReProjection
+from ...commands.project.format_data import FitWithEnvelopes, FitEnvelopes, EnvelopeInformation
+from ...commands.project.helpers.extract_envelope import CreateFitEnvelope
+from ...commands.project.helpers.base_reprojection import BaseReProjection
 from .base_fit_processing import BaseFitProcessing
 from .polynomial_bordered import ProcessedBorderedPolynomialFit
 
