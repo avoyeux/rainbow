@@ -105,3 +105,4 @@ file:
     video: !join [*_config, 'video.yml']
     volume: !join [*_config, 'volume.yml']
     fake: !join [*_config, 'fake.yml']
+    vis_fig: !join [*_config, 'vis_fig.yml']

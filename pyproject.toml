@@ -102,6 +102,7 @@ contour = "rainbow.cli:contour"
 volume = "rainbow.cli:volume"
 fake = "rainbow.cli:fake"
 vis = "rainbow.cli:vis"
+vis_fig = "rainbow.cli:vis_fig"
 
 [build-system]
 requires = ["uv_build>=0.12.7,<0.13.0"]

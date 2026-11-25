@@ -16,14 +16,18 @@ from common import Decorators
 
 # IMPORTs local
 from .config import config
-from .commands import Create, K3dAnimation, SDOProject, Contour, PngToVideo, Volume, Fake
+from .commands import (
+    Create, K3dAnimation, SDOProject, Contour, PngToVideo, Volume, Fake, VisPlot,
+)
 
 # TYPE ANNOTATIONs
 from typing import Any, TYPE_CHECKING
 if TYPE_CHECKING: from argparse import Namespace
 
 # API public
-__all__ = ['create', 'vis', 'project', 'contour', 'video', 'volume', 'fake']
+__all__ = [
+    'create', 'vis', 'project', 'contour', 'video', 'volume', 'fake', 'vis_fig',
+]
 
 
 
@@ -122,11 +126,20 @@ def vis() -> None:
     print('\033[90mStarting 3D visualization...\033[0m', flush=True)
     params = default_args('3D visualization.', config.file.vis)
 
-    # UPDATE
-    params['offscreen'] = True
-
     # RUN
     K3dAnimation(**params)
+
+@Decorators.running_time
+def vis_fig() -> None:
+    """
+    Creates the figures using the created 'vis' png frames.
+    """
+
+    print('\033[90mCreating the "vis" figures...\033[0m', flush=True)
+    params = default_args('Create the "vis" figures.', config.file.vis_fig)
+
+    # RUN
+    VisPlot(**params)
 
 @Decorators.running_time
 def contour() -> None:

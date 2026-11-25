@@ -1,0 +1,12 @@
+# KEYWORD ARGUMENTs for the 'vis_fig' command.
+name: 'sparse'
+folders: 
+  - 'sdo'
+  - 'stereo'
+  - 'top'
+px: 1080
+
+# CONFIG
+processes: 12
+verbose: 2
+flush: true

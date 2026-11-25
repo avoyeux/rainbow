@@ -12,3 +12,4 @@ from .contour import Contour
 from .video import PngToVideo
 from .volume import Volume
 from .fake import Fake
+from .vis_fig import Plot as VisPlot
