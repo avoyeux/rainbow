@@ -1,27 +1,115 @@
 """
 Javascript code patches.
 These are used to be able to move the triad position and set the triad label size.
-Fully written with AI as its Javascript and its getting embeded in the k3d plot...
+The JS part is fully written with AI as its getting embedded in the k3d plot...
 """
 from __future__ import annotations
 
+# IMPORTs standard
+import time
 
-class JSPatch:
+# TYPE ANNOTATIONs
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    # IMPORTs third-party
+    from k3d.headless import k3d_remote
+
+# API public
+__all__ = ['JSPatch']
+
+
+
+class TriadPatch:
     """
-    Javascript code patches.
+    Patches to set the helper triad position and corresponding label size.
+    There patches were written in JS using DeepSeek v4.1.
     """
 
-    @staticmethod
-    def axes_pos() -> str:
+    def __init__(
+            self,
+            remote: k3d_remote,
+            label: float,
+            pos: tuple[float, float],
+            timeout: float = 30.0,
+        ) -> None:
         """
-        Returns the Javascript code patch to move the triad position.
+        Sets up the triad position and corresponding label size.
 
-        Returns:
-            str.
-                The code patch.
+        Arguments:
+            remote -- k3d_remote
+                Remote k3d instance.
+            label -- float
+                Triad label size in em (CSS unit).
+            pos -- tuple[float, float]
+                Triad position relative to the created image.
+            timeout -- float (default: 30.0)
+                Timeout in seconds for the plot to be ready. If passed, raises TimeoutError.
         """
 
-        js = ("""
+        # ARGs
+        self._label = label
+        self._pos = pos
+        self._timeout = timeout
+        self._remote = remote
+        self._primed: bool = False
+
+        # RUN
+        self._set_triad()
+
+    def _set_triad(self) -> None:
+        """
+        Waits for the plot to be ready and sets the triad position and label size.
+        """
+
+        self._wait_for_instance()
+
+        # AXES label size
+        self._label_size()
+
+        # AXES pos
+        self._move_triad()
+
+    def label_sync(self) -> None:
+        """
+        Moves the label position once the plot is synced.
+        """
+
+        if not self._primed:
+            js = """
+                var world = K3DInstance.getWorld();
+                var scale = K3DInstance.parameters.screenshotScale || 1;
+
+                return world.renderOffScreen(
+                    Math.floor(world.width * scale),
+                    Math.floor(world.height * scale),
+                ).then(function () { return 'primed'; });
+            """
+
+            self._remote.browser.execute_script(js)  #type:ignore
+            self._primed = True
+
+    def _wait_for_instance(self) -> None:
+        """
+        Blocks until k3d's ``K3DInstance`` exists in the page.
+
+        Raises:
+            TimeoutError: If ``K3DInstance`` never appears.
+        """
+
+        deadline = time.monotonic() + self._timeout
+        while self._check_k3d():
+            if time.monotonic() > deadline:
+                raise TimeoutError(
+                    "k3d's K3DInstance was not created in the page within %g s." % self._timeout
+                )
+            time.sleep(0.1)
+
+    def _move_triad(self) -> None:
+        """
+        Moves the triad position.
+        """
+
+        js = """
         (function (FX, FY) {
             var world = K3DInstance.getWorld();
             if (world.__rainbowAxesPos) return 'already installed';
@@ -101,59 +189,39 @@ class JSPatch:
 
             return 'installed';
         })(arguments[0], arguments[1]);
-        """)
-        return js
-
-    @staticmethod
-    def label_size() -> str:
-        """
-        Returns the Javascript code patch to set the triad label size.
-
-        Returns:
-            str.
-                The code patch.
         """
 
-        js = ("""
+        # RUN
+        self._remote.browser.execute_script(js, *self._pos)  #type:ignore
+
+    def _label_size(self) -> None:
+        """
+        Sets the triad label size.
+        """
+
+        js = f"""
             const s = document.createElement('style');
-            s.textContent = 'div[style*="position: absolute"]{font-size: 1.4em !important;}';
+            s.textContent = 'div[style*="position: absolute"]{{font-size: {self._label}em !important;}}';
             document.head.appendChild(s);
-        """)
-        return js
-
-    @staticmethod
-    def label_sync() -> str:
         """
-        Returns the Javascript code patch to sync the triad label position.
+
+        # RUN
+        self._remote.browser.execute_script(js)  #type:ignore
+
+    def _check_k3d(self) -> bool:
+        """
+        Checks if the k3d instance is setup.
 
         Returns:
-            str.
-                The code patch.
+            bool
+                Whether the instance is setup or not.
         """
 
-        js = ("""
-            var world = K3DInstance.getWorld();
-            var scale = K3DInstance.parameters.screenshotScale || 1;
-
-            return world.renderOffScreen(
-                Math.floor(world.width * scale),
-                Math.floor(world.height * scale),
-            ).then(function () { return 'primed'; });
-        """)
-        return js
-
-    @staticmethod
-    def check_k3d() -> str:
-        """
-        Returns the Javascript code patch to check if the k3d instance is setup.
-
-        Returns:
-            str.
-                The code patch.
-        """
-
-        js = ("""
+        js = """
             return typeof K3DInstance !== 'undefined' && K3DInstance !== null && typeof K3DInstance.getWorld === 'function';
-        """)
-        return js
+        """
+
+        # RUN
+        res = self._remote.browser.execute_script(js)  #type:ignore
+        return ~res
 

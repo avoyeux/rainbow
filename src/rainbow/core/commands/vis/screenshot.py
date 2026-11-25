@@ -11,7 +11,7 @@ import time
 from k3d.headless import get_headless_driver, k3d_remote
 
 # IMPORTs local
-from .js_patch import JSPatch
+from .js_patch import TriadPatch
 from rainbow.config import config
 
 # TYPE ANNOTATIONS
@@ -53,6 +53,7 @@ class Screenshot:
             name: str = '',
             width: int = 1920,
             height: int = 1080,
+            label_size: float = 1.2,
             only_canvas: bool = True,
             extra_args: list[str] | None = None,
             driver: Any = None,
@@ -71,9 +72,8 @@ class Screenshot:
                 Browser width in pixels.
             height -- int (default: 1080)
                 Browser height in pixels.
-            out_dir -- str | None (default: None)
-                The directory that relative capture names are resolved (relative to the current 
-                working directory).
+            label_size -- float (default: 1.2)
+                Triad label size in em (CSS unit).
             only_canvas -- bool (default: True)
                 Whether to capture only the WebGL canvas instead of the whole page.
             extra_args -- list[str] | None (default: None)
@@ -91,15 +91,17 @@ class Screenshot:
         self._plot = plot
         self._width = width
         self._height = height
+        self._label_size = label_size
         self._only_canvas = only_canvas
         self._extra_args = extra_args
         self._driver = driver
         self._axes_helper_pos = axes_helper_pos
         self._remote: k3d_remote = None  #type:ignore
         self._dir = os.path.join(config.dir.output.k3d.frame, name)
-        self._primed = False
-
         os.makedirs(self._dir, exist_ok=True)
+
+        # PLACEHOLDER
+        self._patch: TriadPatch
 
     def __enter__(self) -> Self:
         """
@@ -125,16 +127,10 @@ class Screenshot:
 
         # MOVE the orientation triad
         if self._axes_helper_pos is not None:
-            self._wait_for_instance()
-
-            # AXES label size
-            self._remote.browser.execute_script(JSPatch.label_size()) #type:ignore
-
-            # AXES pos
-            self._remote.browser.execute_script(  #type:ignore
-                JSPatch.axes_pos(),
-                float(self._axes_helper_pos[0]),
-                float(self._axes_helper_pos[1]),
+            self._patch = TriadPatch(
+                remote=self._remote,
+                label=self._label_size,
+                pos=self._axes_helper_pos,
             )
         return self
 
@@ -162,7 +158,7 @@ class Screenshot:
         if sync: self._sync()
 
         # AXES label pos
-        if self._axes_helper_pos is not None and not self._primed: self._prime_axes_delta()
+        if self._axes_helper_pos is not None: self._patch.label_sync()
 
         # SAVE
         self._capture(path)
@@ -178,6 +174,7 @@ class Screenshot:
             # CLOSE session
             self._remote.close()
             self._remote = None  #type:ignore
+            self._patch = None  #type:ignore
 
     def _sync(self, hold: bool = True) -> None:
         """
@@ -203,35 +200,6 @@ class Screenshot:
 
         png = self._remote.get_screenshot(only_canvas=self._only_canvas)
         with open(path, 'wb') as file: file.write(png)
-
-    def _wait_for_instance(self, timeout: float = 30.0) -> None:
-        """
-        Blocks until k3d's ``K3DInstance`` exists in the page.
-
-        Args:
-            timeout -- float (default: 30.0)
-                How long to wait before giving up.
-
-        Raises:
-            TimeoutError: If ``K3DInstance`` never appears.
-        """
-
-        deadline = time.monotonic() + timeout
-        while not self._remote.browser.execute_script(JSPatch.check_k3d()):  #type:ignore
-            if time.monotonic() > deadline:
-                raise TimeoutError(
-                    "k3d's K3DInstance was not created in the page within %g s." % timeout
-                )
-            time.sleep(0.1)
-
-    def _prime_axes_delta(self) -> None:
-        """
-        Recomputes the triad label shift from a render, once the plot is synced.
-        ``execute_script`` waits for the returned promise, so the shift is in place on return.
-        """
-
-        self._remote.browser.execute_script(JSPatch.label_sync())  #type:ignore
-        self._primed = True
 
     def _require_session(self) -> None:
         """
