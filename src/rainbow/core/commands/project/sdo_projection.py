@@ -29,7 +29,7 @@ from .helpers.extract_envelope import ExtractEnvelope
 from .helpers.base_reprojection import BaseReProjection
 from .helpers.cartesian_to_polar import CartesianToPolar
 from .helpers.warped_information import AllWarpedTreatment
-from ..data.polynomial_fit.polynomial_reprojection import ReProjectionProcessedPolynomial
+from rainbow.core.data.polynomial_fit.polynomial_reprojection import ReProjectionProcessedPolynomial
 
 # TYPE ANNOTATIONs
 from typing import cast, overload, Literal, Any, TYPE_CHECKING

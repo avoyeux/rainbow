@@ -17,7 +17,7 @@ from typing import cast
 
 # IMPORTs local
 from rainbow.config import config
-from ...projection.format_data import ImageBorders, FitEnvelopes, EnvelopeInformation
+from ...project.format_data import ImageBorders, FitEnvelopes, EnvelopeInformation
 
 # API public
 __all__ = ['ExtractEnvelope']

@@ -16,9 +16,9 @@ import matplotlib.dates as mdates
 from common import Decorators
 
 # IMPORTs local
-from config import config
-from src.projection.format_data import WarpedIntegration, AllWarpedInformation
-from src.projection.sdo_reprojection import OrthographicalProjection
+from rainbow.config import config
+from ..format_data import WarpedIntegration, AllWarpedInformation
+from ..sdo_projection import OrthographicalProjection
 
 # TYPE ANNOTATIONs
 from typing import TypeGuard

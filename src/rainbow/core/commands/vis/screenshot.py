@@ -93,7 +93,7 @@ class Screenshot:
         self._driver = driver
         self._axes_helper_pos = axes_helper_pos
         self._remote: k3d_remote = None  #type:ignore
-        self._dir = config.dir.output.k3d
+        self._dir = config.dir.output.k3d.frame
         self._primed = False
 
     def __enter__(self) -> Self:

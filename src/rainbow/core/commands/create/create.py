@@ -28,7 +28,7 @@ from common import Decorators, CustomDate
 # IMPORTs local
 from .stereo import Stereo
 from rainbow.config import config
-from rainbow.core.miscellaneous.shared_memory import Shared
+from rainbow.core.misc.shared_memory import Shared
 from rainbow.core.data.helpers.all_sdo_dates import AllSDOMetadata
 from rainbow.core.data.polynomial_fit.base_polynomial_fit import Polynomial
 from rainbow.core.data.base_hdf5_creator import VolumeInfo, BaseHDF5Protuberance

@@ -51,7 +51,6 @@ dir:
 
         hdf5: &_hdf5 !join [*_output, 'hdf5']
         mp4_saves: !join [*_output, 'mp4_saves']
-        k3d: !join [*_output, 'k3d']
 
         fake:
             _path: &_fake !join [*_output, 'fake']
@@ -63,6 +62,13 @@ dir:
 
                 fits: !join [*_fake_sdo, 'fits']
                 png: !join [*_fake_sdo, 'png']
+
+        k3d:
+            _path: &_k3d !join [*_output, 'k3d']
+
+            vid: !join [*_k3d, 'vid']
+            fig: !join [*_k3d, 'fig']
+            frame: !join [*_k3d, 'frame']
 
         results:
             _path: &_results !join [*_output, 'results']

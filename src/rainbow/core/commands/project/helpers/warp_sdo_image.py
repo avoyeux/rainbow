@@ -13,7 +13,7 @@ import numpy as np
 
 # IMPORTs local
 from ..format_data import ImageBorders, FitEnvelopes
-from ...data.polynomial_fit.base_fit_processing import BaseFitProcessing
+from rainbow.core.data.polynomial_fit.base_fit_processing import BaseFitProcessing
 
 # TYPE ANNOTATIONs
 from typing import cast
