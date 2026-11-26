@@ -1,4 +1,7 @@
 # KEYWORD ARGUMENTs for the project command.
+name: 'test'
+integration_time:
+  - 1
 polynomial_order:
   - 4
 choices:
@@ -7,11 +10,11 @@ choices:
   - 'fit'
   - 'sdo image'
   - 'envelope'
-  - 'warp'
-  - 'all sdo images'
+  # - 'warp'
+  # - 'all sdo images' # ! it doesn't even exist, does it?
 warp_integration_type: 'mean'
 
 # CONFIG
-processes: 10
-verbose: 1
-flush: false
+processes: 2
+verbose: 10
+flush: true

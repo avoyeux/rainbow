@@ -84,7 +84,7 @@ dir:
                 plots: !join [*_textures, 'plots']
                 screenshots: !join [*_textures, 'screenshots']
 
-            projection:
+            project:
                 _path: &_projection !join [*_results, 'projection']
 
                 sdo: !join [*_projection, 'sdo']

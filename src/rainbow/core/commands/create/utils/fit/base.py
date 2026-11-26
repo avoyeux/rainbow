@@ -21,10 +21,14 @@ from common import Decorators
 # IMPORTs local
 from rainbow.config import config
 from rainbow.core.misc.shared_memory import Shared
+from .axes import Axes
+import numpy.typing as npt
 
 # TYPE ANNOTATIONs
 from typing import Any, Callable, cast, Literal, TYPE_CHECKING
 if TYPE_CHECKING:
+    # IMPORTs third-party
+
     # IMPORTs local
     from rainbow.typing import CounterType, QueueType, SharedMemoryType
 
@@ -33,60 +37,30 @@ __all__ = ['Polynomial', 'GetPolynomialFit']
 
 
 
-@dataclass(slots=True, repr=False, eq=False)  # ! it is a patch, but might keep it
-class AxesOrder:
-    """
-    To get the axes order swap depending on the shape of the coords.
-    Done like this as I think I was fetching the axes order in another code before, but seems like
-    it is not true any more. Keeping it like this for now to see if I find the reason why I did it
-    it like this.
 
-    Raises:
-        ValueError: if the input shape is not of the usual shape.
-    """
-
-    # DATA shape
-    coords_shape: tuple[int, int]
-
-    # PLACEHOLDER
-    axes_order: list[int] = field(init=False)
-
-    def __post_init__(self) -> None:
-        """
-        To get the axes order depending on the shape of the coords.
-
-        Raises:
-            ValueError: if the input shape is not the usual shape.
-        """
-        if self.coords_shape[0] == 4:
-            self.axes_order = [0, 3, 2, 1]
-        elif self.coords_shape[0] == 3:
-            self.axes_order = [2, 1, 0]
-        else:
-            raise ValueError(f"\033[1;31mThe shape {self.coords_shape} is not recognized.\033[0m")
-
-
-def nth_order_polynomial(order: int, t: np.ndarray, *coeffs: int | float) -> np.ndarray:
+def nth_order_polynomial(order: int, t: np.ndarray, *coef: int | float) -> np.ndarray:
     """
     Polynomial function given an order, a 1D ndarray and the polynomial coefficients. Defined at
     module level (with the order as first argument) so that it can be pickled when passed through
     functools.partial to the multiprocessing subprocesses.
 
     Args:
-        order (int): the polynomial order.
-        t (np.ndarray): the 1D array for which you want the polynomial results.
-        coeffs (int | float): the coefficient(s) for the polynomial in the order a_0 + a_1 * t
-            a_2 * t**2 + ...
+        order -- int
+            The polynomial order.
+        t -- np.ndarray
+            The 1D array for which you want the polynomial results.
+        coef -- int | float
+            The coefficient(s) for the polynomial in the order a_0 + a_1 * t a_2 * t**2 + ...
 
     Returns:
         np.ndarray: the polynomial results.
     """
 
     # INIT
-    result: np.ndarray = cast(np.ndarray, 0)
+    result: np.ndarray = 0  #type:ignore
 
     # POLYNOMIAL
-    for i in range(order + 1): result += coeffs[i] * t**i
+    for i in range(order + 1): result += coef[i] * t ** i
     return result
 
 
@@ -133,15 +107,15 @@ class Polynomial:
                 uses the config file value. Defaults to None.
         """
 
-        # CONFIG attributes
+        # CONFIG
         self.verbose = verbose
         self.flush = flush
 
         # AXES ORDER init
-        self.axes_order = AxesOrder(data.coords.shape).axes_order
+        self._axes = Axes(data.coords.shape).order
 
         # ARGUMENTs
-        self.data = self.reorder_data(data)
+        self.data = self._reorder_data(data)
         self.poly_order = order
         self.feet_sigma = feet_sigma
         self.south_sigma = south_sigma
@@ -153,7 +127,7 @@ class Polynomial:
         # ATTRIBUTEs new
         self.params_init = np.random.rand(order + 1)  # initial (random) polynomial coefficients
 
-    def reorder_data(self, data: sparse.COO) -> sparse.COO:
+    def _reorder_data(self, data: sparse.COO) -> sparse.COO:
         """
         To reorder a sparse.COO array so that the axes orders change. This is done to change which
         axis is 'sorted', as the first axis is always sorted (think about the .ravel() function).
@@ -165,8 +139,8 @@ class Polynomial:
             sparse.COO: the reordered sparse.COO array.
         """
 
-        new_coords = data.coords[self.axes_order]
-        new_shape = [data.shape[i] for i in self.axes_order]
+        new_coords = data.coords[self._axes]
+        new_shape = [data.shape[i] for i in self._axes]
         return sparse.COO(coords=new_coords, data=data.data, shape=new_shape)
 
     def get_information(self) -> dict[str, str | dict[str, str | np.ndarray]]:
@@ -184,11 +158,11 @@ class Polynomial:
         polynomials, parameters = self.get_data()
 
         # AXEs swap  # * will need to change this if I cancel the ax swapping in cls.__init__
-        parameters = parameters[self.axes_order]
-        polynomials = polynomials[self.axes_order]
+        parameters = parameters[self._axes]
+        polynomials = polynomials[self._axes]
 
         # NO DUPLICATEs
-        treated_polynomials = self.no_duplicates_data(polynomials)
+        treated_polynomials = self._no_duplicates_data(polynomials)
         
         # DATA formatting
         information = {
@@ -209,7 +183,7 @@ class Polynomial:
                 ),
             },
             'parameters': {
-                'data': parameters.astype('float32'),
+                'data': parameters,
                 'unit': 'none',
                 'description': (
                     "The constants of the polynomial for the fitting. The shape is (4, total "
@@ -219,16 +193,16 @@ class Polynomial:
                 ),
             },
         }
-        if self.full:
+        if self.full:  # ! not needed anymore
             raw_coords = {
                 'raw_coords': {
-                    'data': polynomials.astype('float32'),
+                    'data': polynomials,
                     'unit': 'none',
                     'description': (
                         "The index positions of the fitting curve for the corresponding data. The "
                         "shape of this data is (4, N) where the rows represent (t, x, y, z). "
                         "Furthermore, the index positions are saved as floats, i.e. if you need "
-                        "to visualise it as voxels, then an np.round() and np.unique() is needed."
+                        "to visualize it as voxels, then an np.round() and np.unique() is needed."
                     ),
                 },
             }
@@ -236,8 +210,9 @@ class Polynomial:
         return information
 
     @Decorators.running_time
-    def no_duplicates_data(self, data: np.ndarray) -> np.ndarray:
+    def _no_duplicates_data(self, data: npt.NDArray[np.float32]) -> npt.NDArray[np.uint16]:
         """
+        todo update docstring
         To get no duplicates uint16 voxel positions from a float type data.
 
         Args:
@@ -278,7 +253,7 @@ class Polynomial:
     def no_duplicates_data_sub(
             data_dict: dict[str, Any],
             counter: CounterType[int],
-            output_queue: QueueType[tuple[int, np.ndarray]],
+            output_queue: QueueType[tuple[int, npt.NDArray[np.uint16]]],
         ) -> None:
         """
         todo update docstring
@@ -304,26 +279,25 @@ class Polynomial:
             # DATA filtering
             if array.shape[0] == 4:
                 data_filters = (array[0, :] == index)
-                data = np.copy(array[1:, data_filters]).astype('float32')
+                data = np.copy(array[1:, data_filters])
             else:
-                data = array.copy().astype('float32')
+                data = array.copy()
 
             # NO DUPLICATEs
             data = np.rint(np.abs(data))
-            data = np.unique(data, axis=1).astype('uint16')
+            data = np.unique(data, axis=1).astype(np.uint16)
 
-            # SAVE results
+            # SAVE
             if array.shape[0] == 4:
-                output_queue.put((index, Polynomial.format_result(data, index)))
+                output_queue.put((index, Polynomial.format_result(data, index, dtype=np.uint16)))
             else:
                 output_queue.put((0, data))
-
-        # CLOSE shared memory
         shm.close()
 
     @Decorators.running_time
-    def get_data(self) -> tuple[np.ndarray, np.ndarray]:
+    def get_data(self) -> tuple[npt.NDArray[np.float32], npt.NDArray[np.float32]]:
         """
+        todo update docstring
         To get the polynomial and corresponding polynomial coefficients. The polynomial in
         this case is the voxel positions of the curve fit as a sparse.COO coords array (i.e. shape
         (4, N) where N the number of non zeros).
@@ -341,14 +315,16 @@ class Polynomial:
         process_nb = min(self.processes, self.time_len)
 
         # Setting up weights as sigma (0 to 1 with 0 being infinite weight)
-        sigma = np.ones(self.data.coords.shape[1], dtype='float64')  # ! changed this
+        sigma = np.ones(self.data.coords.shape[1], dtype=np.float64)  # ! changed this
 
         # MULTIPROCESSING setup
-        shm_coords, coords = Shared.create(self.data.coords.astype('float64'))
+        shm_coords, coords = Shared.create(self.data.coords.astype(np.float64))
         shm_sigma, sigma = Shared.create(sigma)
         manager = mp.Manager()
         counter: CounterType[int] = mp.Value('i', self.time_len - 1)
-        output_queue: QueueType[tuple[int, np.ndarray, np.ndarray]] = manager.Queue()
+        output_queue: QueueType[
+            tuple[int, npt.NDArray[np.float32], npt.NDArray[np.float32]]
+        ] = manager.Queue()
         
         # INPUTs
         kwargs = {
@@ -390,8 +366,8 @@ class Polynomial:
             polynomials_list[identifier] = fit
             parameters_list[identifier] = params
         if len(polynomials_list) != 1:
-            polynomials: np.ndarray = np.concatenate(polynomials_list, axis=1)
-            parameters: np.ndarray = np.concatenate(parameters_list, axis=1)
+            polynomials = np.concatenate(polynomials_list, axis=1, dtype=np.float32)
+            parameters = np.concatenate(parameters_list, axis=1, dtype=np.float32)
         else:
             polynomials = polynomials_list[0]
             parameters = parameters_list[0]
@@ -402,7 +378,7 @@ class Polynomial:
             coords_dict: dict[str, Any],
             sigma_dict: dict[str, Any],
             counter: CounterType[int],
-            output_queue: QueueType[tuple[int, np.ndarray, np.ndarray]],
+            output_queue: QueueType[tuple[int, npt.NDArray[np.float32], npt.NDArray[np.float32]]],
             kwargs_sub: dict[str, Any],
         ) -> None:
         """
@@ -449,11 +425,11 @@ class Polynomial:
                         f"{coords_section.shape})",
                         flush=kwargs_sub['flush'],
                     )
-                result = np.empty((3, 0)) 
-                params = np.empty((3, 0))
+                result = np.empty((3, 0), dtype=np.float32) 
+                params = np.empty((3, 0), dtype=np.float32)
             else:
                 # DISTANCE cumulative
-                t = np.empty(coords_section.shape[1], dtype='float64')
+                t = np.empty(coords_section.shape[1], dtype=np.float64)
                 t[0] = 0
                 for i in range(1, coords_section.shape[1]): 
                     t[i] = t[i - 1] + np.sqrt(np.sum([
@@ -462,8 +438,8 @@ class Polynomial:
                     ]))
                 # CHECK degenerate case (all voxels at the same position)
                 if t[-1] <= 0:
-                    result = np.empty((3, 0))
-                    params = np.empty((3, 0))
+                    result = np.empty((3, 0), dtype=np.float32) 
+                    params = np.empty((3, 0), dtype=np.float32)
                 else:
                     t /= t[-1]  # normalization 
 
@@ -473,23 +449,28 @@ class Polynomial:
                         'sigma': sigma_section,
                         't': t,
                     }
-                    result, params = Polynomial.polynomial_fit(**kwargs, **kwargs_sub)  #type:ignore
+                    result, params = Polynomial._polynomial_fit(**kwargs, **kwargs_sub)  #type:ignore
 
             # SAVE results
             if coords.shape[0] == 4:
                 output_queue.put((
                     index,
-                    Polynomial.format_result(result, index),
-                    Polynomial.format_result(params, index),
+                    Polynomial.format_result(result, index, dtype=np.float32),
+                    Polynomial.format_result(params, index, dtype=np.float32),
                 ))
             else:
-                output_queue.put((0, result, params))
+                output_queue.put((0, result.astype(np.float32), params.astype(np.float32)))
         shm_coords.close()
         shm_sigma.close()
 
     @staticmethod
-    def format_result(data: np.ndarray, time_index: int) -> np.ndarray:
+    def format_result(
+            data: np.ndarray,
+            time_index: int,
+            dtype: npt.DTypeLike = np.float32,
+        ) -> npt.NDArray:
         """
+        todo update docstring
         To format the data so that it has shape (4, N) where 4 represents (t, x, y, z).
 
         Args:
@@ -497,16 +478,21 @@ class Polynomial:
             time_index (int): the time index corresponding to the data.
 
         Returns:
-            np.ndarray: the reformatted data.
+            npt.NDArray
+                The reformatted data.
         """
 
         # DATA formatting
-        time_row = np.full((1, data.shape[1]), time_index)
-        data = np.vstack([time_row, data]).astype('float32')
+        time_row = np.full(
+            shape=(1, data.shape[1]),
+            fill_value=time_index,
+            dtype=dtype,
+        )
+        data = np.vstack([time_row, data.astype(dtype)])
         return data
 
     @staticmethod
-    def polynomial_fit(
+    def _polynomial_fit(
             coords: np.ndarray,
             sigma: np.ndarray,
             t: np.ndarray,
@@ -522,7 +508,7 @@ class Polynomial:
             leg_threshold: float,
             verbose: int,
             flush: bool,
-        ) -> tuple[np.ndarray, np.ndarray]:
+        ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
         """
         To get the polynomial fit of a data cube.
 
@@ -577,7 +563,7 @@ class Polynomial:
         x = nth_order_polynomial(t_fine, *params_x)
         y = nth_order_polynomial(t_fine, *params_y)
         z = nth_order_polynomial(t_fine, *params_z)
-        data = np.stack([x, y, z], axis=0).astype('float64')
+        data = np.stack([x, y, z], axis=0, dtype=np.float64)
 
         # BORDERs cut
         conditions_upper = (  # todo change this when the other changes are finished
@@ -606,8 +592,9 @@ class Polynomial:
             south_sigma: int | float,
             verbose: int,
             flush: bool,
-        ) -> np.ndarray:
+        ) -> npt.NDArray[np.float64]:
         """
+        todo update docstring
         To try a polynomial curve fitting using scipy.optimize.curve_fit(). If scipy can't converge
         on a solution due to the feet weight, then the feet weight is divided by 4 (i.e. the
         corresponding sigma is multiplied by 4) and the fitting is tried again.
@@ -629,7 +616,8 @@ class Polynomial:
             flush (bool): if the print statements should be flushed.
 
         Returns:
-            np.ndarray: the coefficients (params_x, params_y, params_z) of the polynomial.
+            npt.NDArray[np.float64]
+                The coefficients (params_x, params_y, params_z) of the polynomial.
         """
 
         # FITTING (bounded retries instead of unbounded recursion)
@@ -650,7 +638,7 @@ class Polynomial:
                 params_z, _ = scipy.optimize.curve_fit(
                     polynomial, t, z, p0=params_init, sigma=sigma,
                 )
-                return np.stack([params_x, params_y, params_z], axis=0).astype('float64')
+                return np.stack([params_x, params_y, params_z], axis=0, dtype=np.float64)
 
             except Exception:
                 # FITTING failed
@@ -669,7 +657,7 @@ class Polynomial:
                 "\033[1;31mThe curve_fit failed 10 times, skipping this cube.\033[0m",
                 flush=flush,
             )
-        return np.empty((3, 0))
+        return np.empty((3, 0), dtype=np.float64)
 
     def generate_nth_order_polynomial(
             self,
@@ -732,7 +720,7 @@ class GetPolynomialFit:
         self.filepath = filepath
         self.t_fine = np.linspace(0, 1, number_of_points) 
         self.order = polynomial_order
-        
+
         # POINTERs
         self.file, self.polynomial_info = self.get_group_pointer(group_path)
 
@@ -792,9 +780,9 @@ class GetPolynomialFit:
 
         if self.polynomial_info.params.shape[0] == 4:
             mask = (self.polynomial_info.params[0, :] == cube_index)
-            return self.polynomial_info.params[1:4, mask].astype('float64')
+            return self.polynomial_info.params[1:4, mask].astype(np.float64)
         elif self.polynomial_info.params.shape[0] == 3:
-            return self.polynomial_info.params[...].astype('float64')
+            return self.polynomial_info.params[...].astype(np.float64)
         else:
             raise ValueError(
                 f"\033[1;31mThe shape {self.polynomial_info.params.shape} for the parameters "

@@ -21,7 +21,6 @@ __all__ = [
     'UniqueFitPointer',
     'BasePointer',
     'DataPointer',
-    'FakeDataPointer',
     'UniqueDataPointer',
     'CubesPointers',
 ]
@@ -70,7 +69,7 @@ class FitPointer:
         """
 
         data_filter = self.parameters[0, :] == item
-        return self.parameters[1:, data_filter].astype('float64')
+        return self.parameters[1:, data_filter].astype(np.float64)
 
 
 @dataclass(slots=True, repr=False, eq=False)
@@ -134,49 +133,9 @@ class DataPointer(BasePointer):
         Returns:
             np.ndarray: the corresponding data cube.
         """
-        
+
         data_filter = self.pointer[0, :] == item
-        return self.pointer[1:, data_filter].astype('float64')
-
-
-@dataclass(slots=True, repr=False, eq=False)
-class FakeDataPointer(BasePointer):
-    """
-    Class to store the pointer to the fake data cubes used in the polynomial projection module.
-    """
-
-    # POINTERs fit
-    fit_information: None = field(default=None, init=False)
-
-    # INDEXes time
-    real_time_indexes: h5py.Dataset
-    fake_time_indexes: h5py.Dataset
-
-    # PLACEHOLDERs
-    value_to_index: dict[int, int] = field(init=False)
-
-    def __post_init__(self) -> None:
-
-        self.value_to_index = {value: index for index, value in enumerate(self.fake_time_indexes)}
-
-    def __getitem__(self, item: int) -> np.ndarray[tuple[Literal[3], int], np.dtype[np.float64]]:
-        """
-        To get the fake data cube corresponding to the real data cube gotten from the 'item' index.
-
-        Args:
-            item (int): the index of the real data cube to get the corresponding fake data cube.
-
-        Returns:
-            np.ndarray: the corresponding fake data cube.
-        """
-        
-        # INDEX real to fake
-        time_index = int(self.real_time_indexes[item])
-        fake_index = self.value_to_index[time_index]
-
-        # FILTER
-        data_filter = self.pointer[0, :] == fake_index
-        return self.pointer[1:, data_filter].astype('float64')
+        return self.pointer[1:, data_filter].astype(np.float64)
 
 
 @dataclass(slots=True, repr=False, eq=False)
@@ -218,5 +177,3 @@ class CubesPointers:
     full_integration_no_duplicates: UniqueDataPointer | None = field(default=None, init=False)
     integration: list[DataPointer] | None = field(default=None, init=False)
     line_of_sight: DataPointer | None = field(default=None, init=False)
-    fake_data: FakeDataPointer | None = field(default=None, init=False)
-    test_cube: UniqueDataPointer | None = field(default=None, init=False)

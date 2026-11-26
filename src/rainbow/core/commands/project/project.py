@@ -12,11 +12,9 @@ import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
 # IMPORTs local
-from rainbow.core.commands.project.format_data import (
-    ProcessConstants, ProjectionData, ProjectedData, FitEnvelopes,
-)
-from rainbow.core.commands.project.sdo_projection import OrthographicalProjection
-from rainbow.core.commands.project.envelope_distance import EnvelopeDistanceAnnotation
+from .format_data import ProcessConstants, ProjectionData, ProjectedData, FitEnvelopes
+from .sdo_projection import OrthographicalProjection
+from .envelope_distance import EnvelopeDistanceAnnotation
 
 # TYPE ANNOTATIONs
 from typing import cast, Any, TYPE_CHECKING
@@ -128,7 +126,7 @@ class Project(OrthographicalProjection):
 
         sc = None  # for the colorbar
         if projection_data.integration is not None:
-            
+
             for integration in projection_data.integration:
                 # PLOT contours time integrated
                 sc = self.plot_projected_data(
@@ -136,7 +134,7 @@ class Project(OrthographicalProjection):
                     process_constants=process_constants,
                     image_shape=image_shape,
                 )
-        
+
         if projection_data.all_data is not None:
             # PLOT contours all data
             self.plot_contours(
@@ -152,7 +150,7 @@ class Project(OrthographicalProjection):
                 d_theta=self.constants.d_theta,
                 image_shape=image_shape,
             )
-        
+
         if projection_data.full_integration_no_duplicates is not None:
             # PLOT contours full integration
             sc = self.plot_projected_data(
@@ -230,10 +228,9 @@ class Project(OrthographicalProjection):
             ('test cube', projection_data.test_cube),
         ]:
             if self.plot_choices[choice]:
-                name = proj.name + ' contour' #type:ignore # ! check what the type problem is
+                name = proj.name + ' contour' #type:ignore
                 wanted.append(name)
-                if proj is not None:
-                    colors[name] = proj.colour
+                colors[name] = proj.colour  #type:ignore
         final_handles = []
         for name in wanted:
             found = [h for h, l in zip(handles, labels) if l == name]
@@ -244,13 +241,13 @@ class Project(OrthographicalProjection):
         plt.legend(final_handles, wanted, loc='upper right')
 
         # PLOT save
-        plot_name = f"re_projection_{process_constants.date}.png"
+        plot_name = f"{process_constants.date}.png"
         plt.savefig(os.path.join(self.paths['save'], plot_name), dpi=200)
         plt.close()
 
         if self.verbose > 1: 
             print(
-                f'SAVED - nb {process_constants.time_index:04d} - {plot_name}',
+                f'{process_constants.time_index:04d} - SAVED {plot_name}.',
                 flush=self.flush,
             )
 

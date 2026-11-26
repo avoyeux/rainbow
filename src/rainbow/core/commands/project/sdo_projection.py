@@ -22,7 +22,7 @@ from rainbow.config import config
 from .format_data import (
     GlobalConstants, ProcessConstants, ImageBorders, PolarImageInfo,
     ProjectionData, ProjectedData, CubeInformation, EnvelopeInformation,
-    CubesPointers, DataPointer, UniqueDataPointer, FakeDataPointer, FitPointer, UniqueFitPointer,
+    CubesPointers, DataPointer, UniqueDataPointer, FitPointer, UniqueFitPointer,
     FitWithEnvelopes, WarpedDataGroup, AllWarpedInformation,
 )
 from .helpers.extract_envelope import ExtractEnvelope
@@ -57,11 +57,11 @@ class OrthographicalProjection(BaseReProjection):
     @Decorators.running_time
     def __init__(
             self,
-            filepath: str = config.file.data,
+            name: str,
             integration_time: list[int] = [24],
             polynomial_order: list[int] = [4],
             choices: list[str] = [
-                'sdo image', 'no duplicates', 'envelope', 'polynomial', 'test data',
+                'sdo image', 'no duplicates', 'envelope', 'polynomial',
             ],
             arc_length_points: int = 1280,
             warp_pixel_interpolation_order: int = 3,
@@ -90,9 +90,9 @@ class OrthographicalProjection(BaseReProjection):
             choices (list[str], optional): the main choices that the user wants to be in the
                 re-projection. The possible choices are:
                 ['full integration', 'integration',
-                'no duplicates', 'sdo image', 'sdo mask', 'test cube', 'fake data', 'envelope',
-                'fit', 'fit envelope', 'test data', 'line of sight', 'all data', 'warp']
-                ['sdo image', 'no duplicates', 'envelope', 'polynomial', 'test data'].
+                'no duplicates', 'sdo image', 'sdo mask', 'envelope',
+                'fit', 'fit envelope', 'line of sight', 'all data', 'warp']
+                ['sdo image', 'no duplicates', 'envelope', 'polynomial'].
             arc_length_points (int, optional): the number of points used to compute the arc length
                 for the polynomial fit. Defaults to 1280.
             warp_pixel_interpolation_order (int, optional): the order of the interpolation used to
@@ -116,21 +116,12 @@ class OrthographicalProjection(BaseReProjection):
         self.processes = processes
         self.verbose: int = verbose
         self.flush: bool = flush
-        if any(name in root_path for name in ['Documents', 'Codes']):  # ! shitty patch, change it later
-            self.in_local = True
-        else:
-            self.in_local = False
 
         # PARENT
         super().__init__()
 
-        # SERVER connection
-        if self.in_local:
-            from common.server_connection import SSHMirroredFilesystem
-            self.connection = SSHMirroredFilesystem(verbose=self.verbose)
-
         # CONSTANTs
-        self.filepath = filepath
+        self.filepath = config.file.data
         self.solar_r = 6.96e5  # in km
         self.projection_borders = ImageBorders(
             radial_distance=(690, 870),  # in Mm
@@ -148,10 +139,7 @@ class OrthographicalProjection(BaseReProjection):
 
         # PATHs setup
         self.feet = ' with feet' if with_feet else ''
-        self.foldername = (
-            os.path.basename(self.filepath).split('.')[0] + ''.join(self.feet.split(' '))
-        )
-        self.paths = self.path_setup()  # path setup
+        self.paths = self.path_setup(name)  # path setup
 
         # GLOBAL data
         self.Auchere_envelope, self.plot_kwargs = self.global_information()
@@ -166,8 +154,9 @@ class OrthographicalProjection(BaseReProjection):
         """
         return self._warped_information
 
-    def path_setup(self) -> dict[str, str]:
+    def path_setup(self, name: str) -> dict[str, str]:
         """
+        todo update docstring
         To get the paths to the needed directories and files.
 
         Returns:
@@ -176,17 +165,17 @@ class OrthographicalProjection(BaseReProjection):
 
         # PATHs save
         paths = {
-            'sdo': config.dir.input.sdo.fits,
+            'sdo': config.dir.input.sdo.mask,
             'sdo times': config.file.timestamps,
             'save': os.path.join(
-                config.dir.output.results.projection.sdo,
-                self.foldername,  # ? why is the folder name added here??
+                config.dir.output.results.project.sdo,
+                name,  # ? why is the folder name added here??
             ),
         }
 
         # PATHs update
-        paths['save warped'] = paths['save'] + '_warped'
         os.makedirs(paths['save'], exist_ok=True)
+        paths['save warped'] = paths['save'] + '_warped'
         if self.plot_choices['warp']: os.makedirs(paths['save warped'], exist_ok=True)
         return paths
 
@@ -207,10 +196,10 @@ class OrthographicalProjection(BaseReProjection):
         # CHOICES
         possibilities = [
             'full integration',
-            'integration', 'no duplicates', 'sdo image', 'sdo mask', 'test cube', 'fake data',
-            'envelope', 'fit', 'fit envelope', 'test data', 'line of sight', 'all data', 'warp',
+            'integration', 'no duplicates', 'sdo image', 'sdo mask',
+            'envelope', 'fit', 'fit envelope', 'line of sight', 'all data', 'warp',
             'all sdo images',
-        ]   
+        ]
         plot_choices_kwargs = {
             key: False 
             for key in possibilities
@@ -299,7 +288,7 @@ class OrthographicalProjection(BaseReProjection):
             'colors': colors,
         }
         return envelope_data, plot_kwargs
-    
+
     @Decorators.running_time
     def run(self) -> None:
         """
@@ -347,10 +336,6 @@ class OrthographicalProjection(BaseReProjection):
                 "Need to decide how to implement the data passing when no multiprocessing"
             )
 
-        if self.in_local: 
-            self.connection.close()
-            self.connection.cleanup(verbose=self.verbose)
-
         # SAVE WARPED data
         self._warped_information = self.restructure_warped_information(warped_information_list)  
 
@@ -385,7 +370,7 @@ class OrthographicalProjection(BaseReProjection):
                 used, it is a QueueAlias object. If not, it is an int.
             output_queue (QueueAlias | None, optional): the queue used to send the warped data
                 back to the main process. Defaults to None.
-        
+
         Returns:
             np.ndarray | None: the warped data if no multiprocessing is used. Otherwise, None.
         """
@@ -396,7 +381,7 @@ class OrthographicalProjection(BaseReProjection):
             # GLOBAL constants
             self.constants = self.get_global_constants(H5PYFile, init_path)
             data_pointers = CubesPointers()
-            
+
             # DATA pointers
             if self.plot_choices['all data']:
                 filtered_path = init_path + 'Filtered/All data'
@@ -407,7 +392,7 @@ class OrthographicalProjection(BaseReProjection):
                     cube_type='real',
                     interpolate=False,
                 )
-            
+
             if self.plot_choices['no duplicates']:
                 filtered_path = init_path + 'Filtered/No duplicates'
                 data_pointers.no_duplicates = self.get_cubes_information(
@@ -417,7 +402,7 @@ class OrthographicalProjection(BaseReProjection):
                     cube_type='real',
                     interpolate=False,
                 )
-            
+
             if self.plot_choices['full integration']:
                 filtered_path = init_path + 'Time integrated/No duplicates/Full integration'
                 data_pointers.full_integration_no_duplicates = self.get_cubes_information(
@@ -428,7 +413,7 @@ class OrthographicalProjection(BaseReProjection):
                     integration_time='(full)',
                     interpolate=True,
                 )
-            
+
             if self.plot_choices['integration']:
 
                 integrations: list[DataPointer] = cast(
@@ -449,10 +434,10 @@ class OrthographicalProjection(BaseReProjection):
                         integration_time=integration_time,
                         interpolate=True,
                     )
-                
+
                 # INTEGRATION save
                 data_pointers.integration = integrations
-                    
+
             if self.plot_choices['line of sight']:
                 line_of_sight_path = init_path + 'Filtered/SDO line of sight'
                 data_pointers.line_of_sight = self.get_cubes_information(
@@ -462,35 +447,12 @@ class OrthographicalProjection(BaseReProjection):
                     cube_type='real',
                     interpolate=False,
                 )
-            
-            if self.plot_choices['fake data']:
-                fake_path = 'Fake/Filtered/All data'
-                data_pointers.fake_data = self.get_cubes_information(
-                    H5PYFile=H5PYFile,
-                    group_path=fake_path,
-                    cube_name='Fake data',
-                    cube_type='fake',
-                    interpolate=False,
-                )
-
-            if self.plot_choices['test cube']:
-                test_path = 'Test data/Sun surface'
-                data_pointers.test_cube = self.get_cubes_information(
-                    H5PYFile=H5PYFile,
-                    group_path=test_path,
-                    cube_name='Sun surface - TEST',
-                    cube_type='unique',
-                    interpolate=False,
-                )
 
             # NOT MULTIPROCESSING
-            outputs: list[np.ndarray] = cast(
-                list[np.ndarray],
-                [None] * inputs if isinstance(inputs, int) else [],
-            )
+            outputs: list[np.ndarray] = [None] * inputs if isinstance(inputs, int) else []  #type:ignore
             # MULTIPROCESSING
             while True:
-        
+
                 # INFO process 
                 if not isinstance(inputs, int):
                     process: int | None = inputs.get()
@@ -510,7 +472,6 @@ class OrthographicalProjection(BaseReProjection):
 
                 # SDO information
                 filepath = self.constants.ias_paths[process].decode('utf8')
-                if self.in_local: filepath = self.get_file_from_server(filepath)
                 sdo_image_info = self.sdo_image(filepath, colour='')
                 sdo_image_info.image = self.sdo_image_treatment(sdo_image_info.image)
 
@@ -547,7 +508,7 @@ class OrthographicalProjection(BaseReProjection):
                         sdo_info=sdo_image_info,
                         warp=False,
                     )
-                
+
                 if data_pointers.full_integration_no_duplicates is not None:
                     projection_data.full_integration_no_duplicates = self.format_cube(
                         data=data_pointers.full_integration_no_duplicates,
@@ -577,28 +538,9 @@ class OrthographicalProjection(BaseReProjection):
                         )
                         for i, integration in enumerate(data_pointers.integration)
                     ]
-                    
-                if data_pointers.fake_data is not None:
-                    projection_data.fake_data = self.format_cube(
-                        data=data_pointers.fake_data,
-                        constants=process_constants,
-                        colour='black',
-                        sdo_info=sdo_image_info,
-                        warp=False,
-                    )
-
-                if data_pointers.test_cube is not None:
-                    projection_data.test_cube = self.format_cube(
-                        data=data_pointers.test_cube,
-                        constants=process_constants,
-                        colour='yellow',
-                        sdo_info=sdo_image_info,
-                        warp=False,
-                    )
 
                 # CHILD CLASSes functionality
                 self.plotting(process_constants, projection_data)
-                self.create_fake_fits(process_constants, projection_data)
 
                 # WARP final plot
                 if self.plot_choices['warp']:
@@ -608,7 +550,7 @@ class OrthographicalProjection(BaseReProjection):
                         raise NotImplementedError(
                             'Still need to decide what to do when not multiprocessing'
                         )
-                
+
                 # PRINT
                 print(f'nb {process:04d} - DONE', flush=True)
         return np.stack(outputs, axis=0) if output_queue is None else None
@@ -654,7 +596,7 @@ class OrthographicalProjection(BaseReProjection):
                         result=result.integration,
                     )
         return result
-    
+
     def restructure_warped_information_sub(
             self,
             data: ProjectedData,
@@ -679,13 +621,14 @@ class OrthographicalProjection(BaseReProjection):
 
     def format_cube(
             self,
-            data: DataPointer | UniqueDataPointer | FakeDataPointer,
+            data: DataPointer | UniqueDataPointer,
             constants: ProcessConstants,
             colour: str,
             sdo_info: PolarImageInfo,
             warp: bool = False,
         ) -> ProjectedData:
             """
+            todo update docstring
             To format the cube data for the projection.
 
             Args:
@@ -709,9 +652,9 @@ class OrthographicalProjection(BaseReProjection):
                 zt_min=data.zt_min,
                 coords=data[constants.time_index],
             )
-            cube = self.cartesian_pos(cube, dx=self.constants.dx)
+            cube = self.cartesian_pos(data=cube, dx=self.constants.dx)
             coords = self.get_polar_image(
-                self.matrix_rotation(data=cube.coords, sdo_pos=sdo_info.sdo_pos),
+                data=self.matrix_rotation(data=cube.coords, sdo_pos=sdo_info.sdo_pos),
             )
             cube.coords = coords
 
@@ -719,15 +662,12 @@ class OrthographicalProjection(BaseReProjection):
             if data.fit_information is None:
                 fit_n_envelopes = None
             else:
-                fit_n_envelopes: list[FitWithEnvelopes] | None = cast(
-                    list[FitWithEnvelopes],
-                    [None] * len(data.fit_information),
-                )
+                fit_n_envelopes: list[FitWithEnvelopes] = [None] * len(data.fit_information)  #type:ignore
 
                 for i, polynomial_order in enumerate(self.polynomial_order):
-                    reprojected_polynomial = ReProjectionProcessedPolynomial(
+                    project_polynomial = ReProjectionProcessedPolynomial(
                         name=f"Fit ({polynomial_order}th) of " + data.name.lower(),
-                        colour=cast(list[str], self.plot_kwargs['colors'])[i],  # ! most likely the wrong choice of colours
+                        colour=cast(list[str], self.plot_kwargs['colors'])[i],  # ! most likely the wrong choice of colors
                         filepath=self.filepath,
                         group_path=data.group_path,
                         dx=self.constants.dx,
@@ -741,9 +681,9 @@ class OrthographicalProjection(BaseReProjection):
                             and self.Auchere_envelope is None
                         ),
                     )
-  
+
                     fit_n_envelope = (
-                        reprojected_polynomial.reprocessed_fit_n_envelopes(
+                        project_polynomial.reprocessed_fit_n_envelopes(
                             index=constants.time_index,
                             sdo_pos=sdo_info.sdo_pos,
                         )
@@ -779,40 +719,6 @@ class OrthographicalProjection(BaseReProjection):
             )
             return projection
 
-    def get_file_from_server(self, filepath: str, fail_count: int = 0) -> str:
-        """  # ! doesn't restart the download as intended... 
-        To get the file from the server. If the file is not found, the function will try again
-        until it reaches a certain number of tries.
-
-        Args:
-            filepath (str): the server filepath to the file.
-            fail_count (int, optional): the number of times the function has failed to get the
-                file from the server. Defaults to 0.
-
-        Raises:
-            Exception: if the function has failed to get the file from the server more than a
-                certain number of times.
-
-        Returns:
-            str: the new local path to the file.
-        """
-
-        if fail_count > 10:
-            raise Exception(
-                f"\033[1;31mFailed to get the file '{filepath}' from the server. "
-                "Killing process\033[0m"
-            )
-
-        try:
-            filepath = self.connection.mirror(filepath, strip_level=1)
-        except Exception as e:
-            if self.verbose > 1: print(f'\033[1;31m{e}\nTrying again...\033[0m', flush=self.flush)
-            fail_count += 1
-            time.sleep(0.5)
-            return self.get_file_from_server(filepath=filepath, fail_count=fail_count)
-        finally:
-            return filepath
-
     def get_global_constants(self, H5PYFile: h5py.File, init_path: str) -> GlobalConstants:
         """
         To get the global constants of the data.
@@ -841,7 +747,7 @@ class OrthographicalProjection(BaseReProjection):
             time_indexes=time_indexes,
         )
         return constants
-    
+
     @overload
     def get_cubes_information(
             self,
@@ -852,7 +758,7 @@ class OrthographicalProjection(BaseReProjection):
             integration_time: int | str | None = ...,
             interpolate: bool = ...,
         ) -> DataPointer: ...
-    
+
     @overload
     def get_cubes_information(
             self,
@@ -863,18 +769,7 @@ class OrthographicalProjection(BaseReProjection):
             integration_time: int | str | None = ...,
             interpolate: bool = ...,
         ) -> UniqueDataPointer: ...
-    
-    @overload
-    def get_cubes_information(
-            self,
-            H5PYFile: h5py.File,
-            group_path: str,
-            cube_name: str,
-            cube_type: Literal['fake'],
-            integration_time: int | str | None = ...,
-            interpolate: bool = ...,
-        ) -> FakeDataPointer: ...
-    
+
     @overload # fallback
     def get_cubes_information(
             self,
@@ -884,7 +779,7 @@ class OrthographicalProjection(BaseReProjection):
             cube_type: str = ...,
             integration_time: int | str | None = ...,
             interpolate: bool = ...,
-        ) -> DataPointer | UniqueDataPointer | FakeDataPointer: ...
+        ) -> DataPointer | UniqueDataPointer: ...
 
     def get_cubes_information(
             self,
@@ -894,8 +789,9 @@ class OrthographicalProjection(BaseReProjection):
             cube_type: str = 'real',
             integration_time: int | str | None = None,
             interpolate: bool = False,
-        ) -> DataPointer | UniqueDataPointer | FakeDataPointer:
+        ) -> DataPointer | UniqueDataPointer:
         """
+        todo update docstring
         To get the information about the data cubes.
 
         Args:
@@ -962,21 +858,7 @@ class OrthographicalProjection(BaseReProjection):
             )
 
         else:
-            # FAKE time indexes
-            time_indexes: h5py.Dataset = cast(h5py.Dataset, H5PYFile['Fake/Time indexes'])
-
-            # FORMAT cube
-            cube_info = FakeDataPointer(
-                xt_min=xt_min,
-                yt_min=yt_min,
-                zt_min=zt_min,
-                group_path=group_path,
-                pointer=cast(h5py.Dataset, H5PYFile[group_path + '/coords']),
-                name=cube_name,
-                integration_time=None,  # ? is this always True for the fake data cubes? 
-                real_time_indexes=self.constants.time_indexes,
-                fake_time_indexes=time_indexes,
-            )
+            raise ValueError(f'Cube type {cube_type} is not recognized.')
         return cube_info
 
     @overload
@@ -998,7 +880,7 @@ class OrthographicalProjection(BaseReProjection):
             integration_time: int | str,
             polynomial_order: int,
         ) -> UniqueFitPointer: ...
-    
+
     @overload  # fallback
     def get_fit_pointer_information(
             self,
@@ -1008,7 +890,7 @@ class OrthographicalProjection(BaseReProjection):
             integration_time: int | str,
             polynomial_order: int,
         ) -> FitPointer | UniqueFitPointer: ...
-    
+
     def get_fit_pointer_information(
             self,
             H5PYFile: h5py.File,
@@ -1111,13 +993,6 @@ class OrthographicalProjection(BaseReProjection):
 
         pass
 
-    def create_fake_fits(self , *args, **kwargs) -> None:
-        """
-        Placeholder for a child class to create fake fits files.
-        """
-
-        pass
-
     def cube_contour(
             self,
             rho: np.ndarray,
@@ -1170,7 +1045,7 @@ class OrthographicalProjection(BaseReProjection):
         image[rho, theta] = 1
         lines = self.image_contour(image, d_theta)
         return image, lines
-    
+
     def image_contour(
             self,
             image: np.ndarray,

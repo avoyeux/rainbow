@@ -117,7 +117,7 @@ class Create(BaseHDF5Protuberance):
             verbose -- int (default: 0)
                 The verbosity level for the prints.
             flush -- bool (default: False)
-                Whether to flush the prints. 
+                Whether to flush the prints.
         """
 
         # MULTIPROCESSING setup
@@ -352,7 +352,7 @@ class Create(BaseHDF5Protuberance):
 
         # METADATA
         cube_numbers_info = {
-            'data': np.array(self._cube_numbers).astype('uint16'),
+            'data': np.array(self._cube_numbers).astype(np.uint16),
             'unit': 'none',
             'description': (
                 "The cubes time indexes (i.e. the first row of the data) where there is volumetric"
@@ -1176,7 +1176,7 @@ class Create(BaseHDF5Protuberance):
         for main_option in data_options:
             for sub_option in sub_options:
                 group_path = main_path_2 + main_option + sub_option
-                data = self._get_COO(H5PYFile, group_path).astype('uint16')
+                data = self._get_COO(H5PYFile, group_path).astype(np.uint16)
 
                 # ADD polynomial
                 self._add_polynomial(cast(h5py.Group, H5PYFile[group_path]), data)
