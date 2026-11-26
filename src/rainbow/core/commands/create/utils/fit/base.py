@@ -25,11 +25,11 @@ from rainbow.core.misc.shared_memory import Shared
 # TYPE ANNOTATIONs
 from typing import Any, Callable, cast, Literal, TYPE_CHECKING
 if TYPE_CHECKING:
-    import queue
-    from multiprocessing import shared_memory
-    type LockProxy = Any
-    type ValueProxy = Any
-    type QueueProxy[T] = queue.Queue[T]  # parent type
+    # IMPORTs local
+    from rainbow.typing import CounterType, QueueType, SharedMemoryType
+
+# API public
+__all__ = ['Polynomial', 'GetPolynomialFit']
 
 
 
@@ -249,18 +249,17 @@ class Polynomial:
 
         # MULTIPROCESSING setup
         manager = mp.Manager()
-        lock = manager.Lock()
         output_queue = manager.Queue()
-        value = manager.Value('i', self.time_len)
+        counter: CounterType[int] = mp.Value('i', self.time_len - 1)
         processes_nb = min(self.processes, self.time_len)
         shm, shared = Shared.create(data)
 
         # RUN processes
-        processes: list[mp.Process] = cast(list[mp.Process], [None] * processes_nb)
+        processes: list[mp.Process] = [None] * processes_nb  #type:ignore
         for i in range(processes_nb):
             p = mp.Process(
                 target=self.no_duplicates_data_sub,
-                args=(shared, lock, value, output_queue),
+                args=(shared, counter, output_queue),
             )
             p.start()
             processes[i] = p
@@ -268,28 +267,27 @@ class Polynomial:
         shm.unlink()
 
         # RESULTs formatting
-        polynomials_list: list[np.ndarray] = cast(list[np.ndarray], [None] * self.time_len)
+        polynomials_list: list[np.ndarray] = [None] * self.time_len  #type:ignore
         while not output_queue.empty():
             identifier, result = output_queue.get()
             polynomials_list[identifier] = result
-        polynomials: np.ndarray = np.concatenate(polynomials_list, axis=1).astype('uint16')
+        polynomials = np.concatenate(polynomials_list, axis=1).astype(np.uint16)
         return polynomials
 
     @staticmethod
     def no_duplicates_data_sub(
             data_dict: dict[str, Any],
-            lock: LockProxy,
-            value: ValueProxy,
-            output_queue: QueueProxy[tuple[int, np.ndarray]],
+            counter: CounterType[int],
+            output_queue: QueueType[tuple[int, np.ndarray]],
         ) -> None:
         """
+        todo update docstring
         To multiprocess the no duplicates uint16 voxel positions treatment.
 
         Args:
-            data (dict[str, Any]): the information to get the data from a
+            data_dict (dict[str, Any]): the information to get the data from a
                 multiprocessing.shared_memory.SharedMemory() object.
-            lock (LockProxy): the lock to properly update the shared index value.
-            value (ValueProxy): the shared index value.
+            counter (CounterType[int]): the shared index value.
             output_queue (QueueProxy): the queue to save the results.
         """
         
@@ -297,11 +295,11 @@ class Polynomial:
         shm, array = Shared.open(data_dict)
 
         while True:
-            # CHECK input
-            with lock:
-                index = int(value.value) - 1
+            # NEXT
+            with counter.get_lock():
+                index = counter.value
                 if index < 0: break
-                value.value -= 1
+                counter.value -= 1
 
             # DATA filtering
             if array.shape[0] == 4:
@@ -349,17 +347,14 @@ class Polynomial:
         shm_coords, coords = Shared.create(self.data.coords.astype('float64'))
         shm_sigma, sigma = Shared.create(sigma)
         manager = mp.Manager()
-        lock = manager.Lock()
-        value = manager.Value('i', self.time_len)
-        # * tried 'i' but clearly didn't give a signed integer
-        output_queue: QueueProxy[tuple[int, np.ndarray, np.ndarray]] = manager.Queue()
+        counter: CounterType[int] = mp.Value('i', self.time_len - 1)
+        output_queue: QueueType[tuple[int, np.ndarray, np.ndarray]] = manager.Queue()
         
         # INPUTs
         kwargs = {
             'coords_dict': coords,
             'sigma_dict': sigma,
-            'lock': lock,
-            'value': value,
+            'counter': counter,
             'output_queue': output_queue,
         }
         kwargs_sub = {
@@ -406,12 +401,12 @@ class Polynomial:
     def get_data_sub(
             coords_dict: dict[str, Any],
             sigma_dict: dict[str, Any],
-            lock: LockProxy,
-            value: ValueProxy,
-            output_queue: QueueProxy[tuple[int, np.ndarray, np.ndarray]],
+            counter: CounterType[int],
+            output_queue: QueueType[tuple[int, np.ndarray, np.ndarray]],
             kwargs_sub: dict[str, Any],
         ) -> None:
         """
+        todo update docstring
         Static method to multiprocess the curve fitting creation.
 
         Args:
@@ -419,8 +414,7 @@ class Polynomial:
                 multiprocessing.shared_memory.SharedMemory() object.
             sigma_dict (dict[str, Any]): the weights (here sigma) information to access the
                 multiprocessing.shared_memory.SharedMemory() object.
-            lock (LockProxy): the lock to properly update the shared index value.
-            value (ValueProxy): the shared index value.
+            counter (CounterType[int]): the shared index value.
             output_queue (mp.queues.Queue): the output_queue to save the results.
             kwargs_sub (dict[str, Any]): the kwargs for the polynomial_fit function.
         """
@@ -431,10 +425,10 @@ class Polynomial:
         
         while True:
             # CHECK input
-            with lock:
-                index = int(value.value) - 1
+            with counter.get_lock():
+                index = counter.value
                 if index < 0: break
-                value.value -= 1
+                counter.value -= 1
 
             if coords.shape[0] == 4:
                 # DATA filtering

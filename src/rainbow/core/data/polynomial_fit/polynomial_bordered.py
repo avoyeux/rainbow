@@ -11,7 +11,7 @@ import numpy as np
 
 # IMPORTs local
 from ...commands.project.format_data import CubeInformation
-from .base_polynomial_fit import GetPolynomialFit
+from rainbow.core.commands.create.utils.fit import GetPolynomialFit
 
 # TYPE ANNOTATIONs
 from typing import Any, Literal

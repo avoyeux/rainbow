@@ -26,12 +26,12 @@ from astropy import units as u
 from common import Decorators, CustomDate
 
 # IMPORTs local
-from .stereo import Stereo
 from rainbow.config import config
 from rainbow.core.misc.shared_memory import Shared
-from rainbow.core.data.helpers.all_sdo_dates import AllSDOMetadata
-from rainbow.core.data.polynomial_fit.base_polynomial_fit import Polynomial
-from rainbow.core.data.base_hdf5_creator import VolumeInfo, BaseHDF5Protuberance
+from .utils.stereo import Stereo
+from .utils.sdo import AllSDOMetadata
+from .utils.fit import Polynomial
+from .base import VolumeInfo, BaseHDF5Protuberance
 
 # TYPE ANNOTATIONs
 from typing import Any, Callable, cast, TYPE_CHECKING
@@ -45,9 +45,6 @@ if TYPE_CHECKING:
 
 # API public
 __all__ = ['Create']
-
-# todo descriptions change as dates changed and (e.g. raw data) most cube indexes contain no data
-# todo find a solution for SDO positions (probably fitting after opening the data or something).
 
 
 
@@ -85,42 +82,42 @@ class Create(BaseHDF5Protuberance):
         To create the cubes with and/or without feet in an HDF5 file.
 
         Args:
-            filename -- str. Default = 'data.h5'.
+            filename -- str (default: 'data.h5')
                 The filename of the file to be saved.
-            integration_time -- list[int]. Default = [24].
+            integration_time -- list[int] (default: [24])
                 The time(s) in hours used in the time integration of the data. When set to [],
                 no time integration is done.
-            polynomial_points -- int. Default = int(1e6).
+            polynomial_points -- int (default: int(1e6))
                 The number of points used when recreating the polynomial gotten from the curve
                 fitting of the data.
-            polynomial_order -- list[int]. Default = [3, 4, 5].
+            polynomial_order -- list[int] (default: [3, 4, 5])
                 The order(s) used for the polynomial fit of the data. When set to [], no polynomial
                 fit is done.
-            feet_lon_lat -- tuple[tuple[float, float], tuple[float, float]]. Default = (
+            feet_lon_lat -- tuple[tuple[float, float], tuple[float, float]] (default: (
                 (-177, 14.5),
                 (-163.5, -16.5),
-            )
+            ))
                 The positions of the feet in re-projected Heliographic Carrington coordinates.
-            feet_sigma -- float. Default = 1e-4.
+            feet_sigma -- float (default: 1e-4)
                 The sigma uncertainty in the feet used during the curve fitting of the data points.
-            south_leg_sigma -- float. Default = 5.
+            south_leg_sigma -- float (default: 5)
                 The sigma uncertainty in the south leg used during the curve fitting of the data
                 points.
-            leg_threshold -- float. Default = 0.03.
+            leg_threshold -- float (default: 0.03)
                 The threshold used to filter the data in the feet curve fitting.
-            full -- bool. Default = False.
+            full -- bool (default: False)
                 Whether to save all the data. In the case when 'full' is True, the raw coordinates
                 of the polynomial curve are also saved, where as only the indexes that can be
                 directly used as coords in a sparse.COO object.
-            no_feet -- bool. Default = False.
+            no_feet -- bool (default: False)
                 Whether to not add the feet to the data. Defaults to False.
-            compression_lvl -- int | None. Default = 9.
+            compression_lvl -- int | None (default: 9)
                 The level of compression used in the HDF5 file. If None, no compression is done.
-            processes -- int. Default = 1.
+            processes -- int (default: 1)
                 The number of processes used in the multiprocessing.
-            verbose -- int. Default = 0.
+            verbose -- int (default: 0)
                 The verbosity level for the prints.
-            flush -- bool. Default = False.
+            flush -- bool (default: False)
                 Whether to flush the prints. 
         """
 
@@ -306,8 +303,6 @@ class Create(BaseHDF5Protuberance):
             date = datetime(2012, 7, 24, 20, 20, 31)
         elif date.second == 44:
             date = date.replace(second=43)
-
-        # DATE converted
         return date
 
     def _setup_feet(

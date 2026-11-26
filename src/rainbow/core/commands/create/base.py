@@ -14,12 +14,13 @@ import sparse
 import numpy as np
 
 # TYPE ANNOTATIONs
-from typing import final, TypeVar, cast
-type StringOrFloat = str | float
-type ValuesAliases = StringOrFloat | int | np.generic | np.ndarray
-StringOrFloatType = TypeVar("StringOrFloatType", bound=StringOrFloat)
-ValuesType = TypeVar("ValuesType", bound=ValuesAliases)
-DictValuesType = TypeVar("DictValuesType", bound=ValuesAliases | dict)
+from typing import final, TypeVar, TYPE_CHECKING
+if TYPE_CHECKING:
+    type StringOrFloat = str | float
+    type ValuesAliases = StringOrFloat | int | np.generic | np.ndarray
+    StringOrFloatType = TypeVar("StringOrFloatType", bound=StringOrFloat)
+    ValuesType = TypeVar("ValuesType", bound=ValuesAliases)
+    DictValuesType = TypeVar("DictValuesType", bound=ValuesAliases | dict)
 
 
 
@@ -107,7 +108,7 @@ class BaseHdf5Creator:
             # DATASET as values but no dict
             self.add_dataset(
                 parent_group=parent_group,
-                info=cast(dict[str, ValuesAliases], info),
+                info=info,  #type:ignore
                 name=name,
             )
 

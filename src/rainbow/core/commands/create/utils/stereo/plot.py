@@ -21,11 +21,11 @@ if TYPE_CHECKING:
     import numpy.typing as npt
 
 # API public
-__all__ = ['StereoPos']
+__all__ = ['Plot']
 
 
 
-class StereoPos:
+class Plot:
     """
     To visually see if the fit of the STEREO positions is correct.
     """

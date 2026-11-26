@@ -21,7 +21,7 @@ from common import CustomDate
 
 # IMPORTs local
 from rainbow.config import config
-from .plot import StereoPos as Plot
+from .plot import Plot
 
 # TYPE ANNOTATIONs
 from typing import TYPE_CHECKING

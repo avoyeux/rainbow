@@ -20,8 +20,10 @@ from common import Decorators
 from rainbow.config import config
 
 # TYPE ANNOTATIONs
-from typing import cast
-from sitools2.clients.sdo_data import SdoData
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    # IMPORTs third-party
+    from sitools2.clients.sdo_data import SdoData
 
 # API public
 __all__ = ['AllSDOMetadata']
@@ -132,7 +134,7 @@ class AllSDOMetadata:
         date_range = int(date_range.total_seconds() // 60) + 1
 
         # INDEXEs to keep
-        used_indexes: list[int] = cast(list[int], [None] * len(used_datetimes))
+        used_indexes: list[int] = [None] * len(used_datetimes)  #type:ignore
         for i, used_date in enumerate(used_datetimes):
             for j, metadata in enumerate(all_metadata):
                 if metadata.date_obs == used_date: used_indexes[i] = j; break
@@ -157,7 +159,7 @@ class AllSDOMetadata:
             SdoData: the updated SDO metadata.
         """
 
-        metadata.ias_location = cast(str, metadata.ias_location) + '/S00000/image_lev1.fits'
+        metadata.ias_location = metadata.ias_location + '/S00000/image_lev1.fits'
         return metadata
 
     def _needed_datetime(self, time_coef: int) -> datetime:
@@ -184,7 +186,7 @@ class AllSDOMetadata:
             SdoData: the SDO metadata with the microseconds set to 0.
         """
 
-        metadata.date_obs = cast(datetime, metadata.date_obs).replace(microsecond=0)
+        metadata.date_obs = metadata.date_obs.replace(microsecond=0)  #type:ignore
         return metadata
 
     def check_dates(self) -> None:
