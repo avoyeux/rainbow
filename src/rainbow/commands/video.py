@@ -6,7 +6,7 @@ directly fetched from the 'common' personal package.
 from __future__ import annotations
 
 # IMPORTs personal
-from common import PngToVideo
+from common import PngToVideo as Video
 
 # API public
-__all__ = ['PngToVideo']
+__all__ = ['Video']

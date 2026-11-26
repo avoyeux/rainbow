@@ -16,9 +16,7 @@ from common import Decorators
 
 # IMPORTs local
 from .config import config
-from .commands import (
-    Create, K3dAnimation, SDOProject, Contour, PngToVideo, Volume, Fake, VisPlot,
-)
+from .commands import Create, Vis, Project, Contour, Video, Volume, Fake, VisFig
 
 # TYPE ANNOTATIONs
 from typing import Any, TYPE_CHECKING
@@ -115,7 +113,7 @@ def project() -> None:
     params = default_args('Project SDO data.', config.file.project) 
 
     # RUN
-    SDOProject(**params)
+    Project(**params)
 
 @Decorators.running_time
 def vis() -> None:
@@ -127,7 +125,7 @@ def vis() -> None:
     params = default_args('3D visualization.', config.file.vis)
 
     # RUN
-    K3dAnimation(**params)
+    Vis(**params)
 
 @Decorators.running_time
 def vis_fig() -> None:
@@ -139,7 +137,7 @@ def vis_fig() -> None:
     params = default_args('Create the "vis" figures.', config.file.vis_fig)
 
     # RUN
-    VisPlot(**params)
+    VisFig(**params)
 
 @Decorators.running_time
 def contour() -> None:
@@ -166,7 +164,7 @@ def video() -> None:
     for no_key in ['verbose', 'flush']: params.pop(no_key, None)
 
     # RUN
-    PngToVideo(**params)
+    Video(**params)
 
 @Decorators.running_time
 def volume() -> None:

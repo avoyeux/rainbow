@@ -4,7 +4,7 @@ processing.
 """
 
 # IMPORTs local
-from rainbow.core.commands.fake import TotoInputs as Fake
+from rainbow.core.commands import Fake
 
 # API public
 __all__ = ['Fake']

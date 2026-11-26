@@ -5,7 +5,7 @@ Uses the k3d library inside a jupyter notebook.
 from __future__ import annotations
 
 # IMPORTs local
-from rainbow.core.commands.vis import K3dAnimation
+from rainbow.core.commands import Vis
 
 # API public
-__all__ = ['K3dAnimation']
+__all__ = ['Vis']

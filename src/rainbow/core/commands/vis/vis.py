@@ -41,7 +41,7 @@ if TYPE_CHECKING:
     from rainbow.typing import VoxelAlias, JsLinkAlias
 
 # API public
-__all__ = ['K3dAnimation']
+__all__ = ['Vis']
 
 # todo need to improve the names of the different datasets in the visualization
 # todo need to be able to add the extended version of the polynomial fit
@@ -626,7 +626,7 @@ class Setup:
         self._cubes.close()
 
 
-class K3dAnimation(Setup):
+class Vis(Setup):
     """
     Creates the corresponding k3d animation to then be used in a Jupyter notebook file.
     """

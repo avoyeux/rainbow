@@ -365,7 +365,3 @@ class Volume:
         pixel_surface = 4 * d_sun ** 2 * np.tan(angle / 2) ** 2
         surface = float(np.sum(data) * pixel_surface)
         return surface
-
-
-if __name__ == '__main__':
-    volume = Volume(processes=16)

@@ -53,7 +53,7 @@ class SdoHeaderInformation:
         ) / 1e3)
 
 
-class TotoInputs:
+class Fake:
     """
     To create the fake data inputs (i.e. FITs + PNGs) for Dr. Auchere's new_toto.pro code.
     """
@@ -371,13 +371,3 @@ class TotoInputs:
         x = radii * np.cos(theta)
         y = radii * np.sin(theta)
         return np.stack([x.ravel(), y.ravel()], axis=0)
-
-
-
-if __name__=='__main__':
-
-    TotoInputs(
-        processes=8,
-        sphere_radius=(7e5, 7.2e5),
-        sphere_width=1e4,
-    )

@@ -57,7 +57,6 @@ class Create(BaseHDF5Protuberance):
     _weird_stereo_datetime0: datetime = datetime(2012, 7, 24, 20, 6, 44)
     _weird_stereo_datetime1: datetime = datetime(2012, 7, 24, 20, 16, 44)
 
-    @Decorators.running_time
     def __init__(
             self,
             filename: str  = 'data.h5',
@@ -1547,20 +1546,3 @@ class Create(BaseHDF5Protuberance):
             # SAVE
             output_queue.put((index, skyCoord))
         shm.close()
-
-
-
-if __name__=='__main__':
-
-    instance = Create(
-        filename='test.h5',
-        processes=32,
-        integration_time=[3, 6, 12, 24],
-        polynomial_order=[4],
-        feet_sigma=20,
-        south_leg_sigma=20,
-        leg_threshold=0.03,
-        full=False,
-        no_feet=True,
-        compression_lvl=9,
-    )
