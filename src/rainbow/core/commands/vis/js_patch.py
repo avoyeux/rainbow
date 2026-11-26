@@ -97,7 +97,7 @@ class TriadPatch:
         """
 
         deadline = time.monotonic() + self._timeout
-        while self._check_k3d():
+        while not self._check_k3d():
             if time.monotonic() > deadline:
                 raise TimeoutError(
                     "k3d's K3DInstance was not created in the page within %g s." % self._timeout
@@ -223,5 +223,5 @@ class TriadPatch:
 
         # RUN
         res = self._remote.browser.execute_script(js)  #type:ignore
-        return ~res
+        return res
 

@@ -645,8 +645,7 @@ class K3dAnimation(Setup):
             outlines: bool = False,
             texture_resolution: int = 960,  
             offscreen: bool = False,
-            width: int = 1920,
-            height: int = 1080,
+            px: int = 1080,
             **kwargs,
         ) -> None:
         """
@@ -704,8 +703,8 @@ class K3dAnimation(Setup):
         self.time_link: JsLinkAlias  # JavaScript Link between the two widgets
 
         # RUN
-        self._plot: Any = k3d.plot(grid_visible=visible_grid)  # black: background_color=0x000000 #type:ignore
-        self._plot.height = height
+        self._plot: Any = k3d.plot(grid_visible=visible_grid, screenshot_scale=1)  # black: background_color=0x000000 #type:ignore
+        self._plot.height = px
         self._plot.axes_helper = 500
         self._plot.axes = ['x', 'y', 'z']
 
@@ -719,7 +718,7 @@ class K3dAnimation(Setup):
         self._animation()
 
         # OFFSCREEN
-        if offscreen: self._save_offscreen(name=name, width=width, height=height)
+        if offscreen: self._save_offscreen(name=name, width=px, height=px)
 
     def _get_camera(
             self,
