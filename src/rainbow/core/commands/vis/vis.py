@@ -108,9 +108,9 @@ class Vis(Setup):
         self.outlines = outlines
 
         # PLACEHOLDERs
-        self.plot_alldata: list[VoxelAlias] # voxels plot of the all data 
+        self.plot_all_data: list[VoxelAlias] # voxels plot of the all data 
         self.plot_dupli_new: list[VoxelAlias]  # same for the second method
-        self.plot_full_alldata: list[VoxelAlias]  # voxels plot for the full integration
+        self.plot_full_all_data: list[VoxelAlias]  # voxels plot for the full integration
         self.plot_full_no_duplicate: list[VoxelAlias]  # same for the no duplicate data
         self.plot_interv_new: list[VoxelAlias]  # same for the second method
         self.plot_interv_dupli_new: list[VoxelAlias]  # same for the second method
@@ -214,25 +214,25 @@ class Vis(Setup):
         # ALL DATA add
         if self._cubes.all_data is not None:
             # VOXELS create
-            self.plot_alldata = self.create_voxels(self._cubes.all_data, **kwargs)
-            for plot in self.plot_alldata: self._plot += plot     
+            self.plot_all_data = self._create_voxels(self._cubes.all_data, **kwargs)
+            for plot in self.plot_all_data: self._plot += plot     
 
         # NO DUPLICATES add
         if self._cubes.no_duplicate is not None:
             # VOXELs create
-            self.plot_dupli_new = self.create_voxels(self._cubes.no_duplicate, **kwargs)
+            self.plot_dupli_new = self._create_voxels(self._cubes.no_duplicate, **kwargs)
             for plot in self.plot_dupli_new: self._plot += plot
 
         # TIME INTEGRATION add
         if self._cubes.integration_all_data is not None:
             # VOXELs create
-            self.plot_interv_new = self.create_voxels(self._cubes.integration_all_data, **kwargs)
+            self.plot_interv_new = self._create_voxels(self._cubes.integration_all_data, **kwargs)
             for plot in self.plot_interv_new: self._plot += plot
 
         # TIME NO DUPLICATES add
         if self._cubes.integration_no_duplicate is not None:
             # VOXELs create
-            self.plot_interv_dupli_new = self.create_voxels(
+            self.plot_interv_dupli_new = self._create_voxels(
                 self._cubes.integration_no_duplicate,
                 **kwargs,
             )
@@ -241,16 +241,16 @@ class Vis(Setup):
         # FULL INTEGRATION add
         if self._cubes.full_integration_all_data is not None:
             # VOXELs create
-            self.plot_full_alldata = self.create_voxels(
+            self.plot_full_all_data = self._create_voxels(
                 self._cubes.full_integration_all_data,
                 **kwargs,
             )
-            for plot in self.plot_full_alldata: self._plot += plot
+            for plot in self.plot_full_all_data: self._plot += plot
 
         # FULL NO DUPLICATES add
         if self._cubes.full_integration_no_duplicate is not None:
             # VOXELs create
-            self.plot_full_no_duplicate = self.create_voxels(
+            self.plot_full_no_duplicate = self._create_voxels(
                 self._cubes.full_integration_no_duplicate,
                 **kwargs,
             )
@@ -259,13 +259,13 @@ class Vis(Setup):
         # SDO LINE OF SIGHT add
         if self._cubes.los_sdo is not None:
             # VOXELs create
-            self.plot_los_sdo = self.create_voxels(self._cubes.los_sdo, **kwargs)
+            self.plot_los_sdo = self._create_voxels(self._cubes.los_sdo, **kwargs)
             for plot in self.plot_los_sdo: self._plot += plot
 
         # STEREO LINE OF SIGHT add
         if self._cubes.los_stereo is not None:
             # VOXELs create
-            self.plot_los_stereo = self.create_voxels(self._cubes.los_stereo, **kwargs)
+            self.plot_los_stereo = self._create_voxels(self._cubes.los_stereo, **kwargs)
             for plot in self.plot_los_stereo: self._plot += plot
 
         # BUTTON play/pause
@@ -300,7 +300,7 @@ class Vis(Setup):
             self.play_pause_button,
         )
 
-    def create_voxels(
+    def _create_voxels(
             self,
             cube: CubeInfo | UniqueCubeInfo,
             index: int = 0,
@@ -369,8 +369,6 @@ class Vis(Setup):
         for attr_name in self._cubes.__slots__:
             if attr_name in ['hdf5File', 'sdo_pos', 'stereo_pos']: continue
             if getattr(self._cubes, attr_name) is not None: return getattr(self._cubes, attr_name)
-
-        # NO DATA
         return None
 
     def update_plot(self, change: dict[str, Any]) -> None:
@@ -387,7 +385,7 @@ class Vis(Setup):
 
         # ALL DATA
         if self._cubes.all_data is not None:
-            self.update_voxel(self.plot_alldata, self._cubes.all_data, change['new'])
+            self.update_voxel(self.plot_all_data, self._cubes.all_data, change['new'])
         # NO DUPLICATES
         if self._cubes.no_duplicate is not None:
             self.update_voxel(self.plot_dupli_new,self._cubes.no_duplicate,change['new'])
