@@ -117,11 +117,13 @@ class Setup:
         # todo check this and the different possible options
         # CHOICES
         groups = [ 
-            'all data', 'all data integration', 'all data full integration',
-            'no duplicate', 'no duplicate integration', 'no duplicate full integration',
+            'all data integration', 'all data full integration',
+            'no duplicate integration', 'no duplicate full integration',
+        ]
+        modifiers = [
+            'sun', 'all', 'all data', 'no duplicate', 'pov sdo', 'pov stereo', 'with feet',
             'line of sight sdo', 'line of sight stereo',
         ]
-        modifiers = ['sun', 'all dates', 'pov sdo', 'pov stereo', 'with feet']
         possibilities = groups + modifiers
 
         # DEFAULT (all off)
@@ -284,7 +286,7 @@ class Setup:
         # DATEs
         dates_bytes: np.ndarray[tuple[int], np.dtype[np.bytes_]] = HDF5File['Dates'][...]
 
-        if self._choices['all dates']:
+        if self._choices['all']:
             # TIME INDEXEs all
             time_indexes: np.ndarray[tuple[int], np.dtype[np.int_]] = np.arange(
                 0,

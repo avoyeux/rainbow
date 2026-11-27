@@ -46,7 +46,7 @@ class Show:
     data: bool = True
     fit: bool = False
 
-    def __bool__(self) -> bool:  # ? Do I really need this
+    def __bool__(self) -> bool:
         """
         Truthy wether either is True.
 
