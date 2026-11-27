@@ -18,7 +18,7 @@ from rainbow.config import config
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     # IMPORTs local
-    from rainbow.typing import CounterType
+    from rainbow.typing import CounterType, ImageExtension
 
 # API public
 __all__ = ['Plot']
@@ -35,6 +35,7 @@ class Plot:
             name: str,
             folders: list[str],
             px: int = 1280,
+            extension: ImageExtension = '.png',
             processes: int = 1,
             verbose: int = 0,
             flush: bool = False,
@@ -49,6 +50,8 @@ class Plot:
                 List of folder names containing the input png frames.
             px -- int (default: 1280)
                 Number of width pixels of the input images. Used for the figure dpi.
+            extension -- ImageExtension (default: '.png')
+                The extension for the saved figure. Defaults to '.png'.
             processes -- int (default: 1)
                 Number of processes to use for the multiprocessing.
             verbose -- int (default: 0)
@@ -64,6 +67,7 @@ class Plot:
 
         # ARGs
         self._dpi = px
+        self._extension = extension
         self._save = os.path.join(config.dir.output.k3d.fig, name)
         self._files: tuple[tuple[str, ...], ...] = tuple(zip(*[
             sorted(glob(os.path.join(config.dir.output.k3d.frame, folder, '*.png')))
@@ -150,7 +154,7 @@ class Plot:
         for i, path in enumerate(files):  self._add_image(fig, grid, (0, i), path)
 
         # SAVE
-        filepath = os.path.join(self._save, f'fig{index:04d}.png')
+        filepath = os.path.join(self._save, f'fig{index:04d}{self._extension}')
         plt.savefig(
             fname=filepath,
             pad_inches=0.,
