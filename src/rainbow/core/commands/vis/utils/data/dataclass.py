@@ -12,10 +12,12 @@ import h5py
 import numpy as np
 
 # TYPE ANNOTATIONs
-from typing import Any, Self
+from typing import Any, Self, TypedDict
 
 # API public
 __all__ = [
+    'Show',
+    'ShowTD',
     'CubesConstants',
     'CubesData',
     'PolynomialData',
@@ -24,6 +26,35 @@ __all__ = [
     'UniqueCubeInfo',
 ]
 
+
+
+class ShowTD(TypedDict):
+    """
+    Whether to show the data and/or the fit.
+    """
+
+    data: bool
+    fit: bool
+
+
+@dataclass(slots=True, frozen=True, repr=False, eq=False)
+class Show:
+    """
+    Whether to display the data and/or the polynomial fit of a data group.
+    """
+
+    data: bool = True
+    fit: bool = False
+
+    def __bool__(self) -> bool:  # ? Do I really need this
+        """
+        Truthy wether either is True.
+
+        Returns:
+            bool
+                True if either is True, False otherwise.
+        """
+        return self.data or self.fit
 
 
 @dataclass(slots=True, frozen=True, repr=False, eq=False)
@@ -63,14 +94,14 @@ class PolynomialData:
         Returns:
             np.ndarray: the polynomial data.
         """
-                    
+
         # FILTER
         cube_filter = self.dataset[0] == index
         cube_coords = self.dataset[1:, cube_filter]
 
         # NO DATA
         if cube_coords.size == 0: return np.zeros((1, 1, 1), dtype='uint8')
-        
+
         # DATA 3D
         cube_shape = np.max(cube_coords, axis=1) + 1
         cube = np.zeros(cube_shape, dtype='uint8')
@@ -93,7 +124,7 @@ class UniquePolynomialData(PolynomialData):
         Returns:
             np.ndarray: the polynomial data.
         """
-        
+
         # 3D array
         cube_shape = np.max(self.dataset, axis=1) + 1
         cube = np.zeros(cube_shape, dtype='uint8')
@@ -121,6 +152,9 @@ class ParentInfo:
     # DATA
     dataset_coords: h5py.Dataset
     dataset_values: h5py.Dataset
+
+    # DISPLAY
+    show: Show = field(default_factory=Show)
 
     # COORDs shape
     name: str = field(init=False)
@@ -172,19 +206,22 @@ class CubeInfo(ParentInfo):
             values = self.dataset_values[...]
         else:
             values = self.dataset_values[cube_filter.ravel()]
-        
+
         # NO DATA
-        if cube_coords.size == 0: 
-            result = (
-                [np.zeros((1, 1, 1), dtype='uint8')]
-                * (1 + (len(self.polynomials) if self.polynomials is not None else 0))
-            )
+        if cube_coords.size == 0: # todo check this
+            result: list[np.ndarray] = []
+            if self.show.data:
+                result.append(np.zeros((1, 1, 1), dtype=np.uint8))
+            if self.polynomials is not None:
+                result += [np.zeros((1, 1, 1), dtype=np.uint8) for _ in self.polynomials]
             return result
 
         # DATA 3D
-        cube = np.zeros(self.shape[1:], dtype='uint8')
-        cube[tuple(cube_coords)] = values
-        result = [cube]
+        result: list[np.ndarray] = []  # todo check this
+        if self.show.data:
+            cube = np.zeros(self.shape[1:], dtype=np.uint8)
+            cube[tuple(cube_coords)] = values
+            result.append(cube)
 
         # POLYNOMIALs
         if self.polynomials is not None:
@@ -215,9 +252,11 @@ class UniqueCubeInfo(ParentInfo):
         """
 
         # CUBE
-        cube = np.zeros(self.shape, dtype='uint8')
-        cube[tuple(self.dataset_coords)] = self.dataset_values[...]
-        result = [cube]
+        result: list[np.ndarray] = []  # todo check this
+        if self.show.data:
+            cube = np.zeros(self.shape, dtype=np.uint8)
+            cube[tuple(self.dataset_coords)] = self.dataset_values[...]
+            result.append(cube)
 
         # POLYNOMIALs
         if self.polynomials is not None:  # ! could be wrong as there is only one index here

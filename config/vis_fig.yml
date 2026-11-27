@@ -1,12 +1,13 @@
 # KEYWORD ARGUMENTs for the 'vis_fig' command.
-name: 'sparse'
+name: 'sparse_3h_fit'
 folders: 
-  - 'sdo'
-  - 'stereo'
-  - 'top'
-px: 1080
+  - 'sdo_3h_fit'
+  - 'stereo_3h_fit'
+  - 'top_3h_fit'
+px: 720
+extension: '.png'
 
 # CONFIG
-processes: 12
+processes: 20
 verbose: 2
 flush: true

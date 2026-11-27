@@ -19,6 +19,7 @@ from common import Plot, Decorators
 from rainbow.config import config
 from .dataclass import (
     CubesData, CubesConstants, CubeInfo, UniqueCubeInfo, PolynomialData, UniquePolynomialData,
+    Show, ShowTD,
 )
 
 # TYPE ANNOTATIONs
@@ -31,6 +32,8 @@ if TYPE_CHECKING:
 __all__ = ['Setup']
 
 
+# ? what about the extended fit. Need to see if that still exist or is needed
+
 
 class Setup:
     """
@@ -42,7 +45,11 @@ class Setup:
     def __init__(
             self,
             filepath: str = config.file.data,
-            choices: list[str] = ['sdo pov', 'sun', 'no duplicate', 'fit'],
+            choices: dict[str, bool | ShowTD] = {
+                'pov sdo': True,
+                'sun': True,
+                'no duplicate': {'data': True, 'fit': True},
+            },
             time_interval: int = 24,
             polynomial_order: list[int] = [4],
             verbose: int = 0,
@@ -80,17 +87,22 @@ class Setup:
 
         # ATTRIBUTES new
         self._choices = self._get_choices(choices)
-        self._plot_polynomial_colors = [
-            next(Plot.random_hexadecimal_int_color_generator())
-            for _ in self._polynomial_order
-        ]
+        # self._plot_polynomial_colors = [
+        #     next(Plot.random_hexadecimal_int_color_generator())
+        #     for _ in self._polynomial_order
+        # ]
+        self._plot_polynomial_colors = [self.color_str_to_hex('cyan') for _ in self._polynomial_order]
         self._feet = ' with feet' if self._choices['with feet'] else ''
 
         # RUN
         self._cubes = self._get_data()
 
-    def _get_choices(self, plot_choices: list[str]) -> dict[str, bool]:
+    def _get_choices(
+            self,
+            plot_choices: dict[str, bool | ShowTD],
+        ) -> dict[str, Show]:
         """
+        todo update docstring
         Checks and formats the choices given by the user.
 
         Args:
@@ -102,31 +114,30 @@ class Setup:
         Returns:
             dict[str, bool]: the formatted choices.
         """
-
+        # todo check this and the different possible options
         # CHOICES
-        possibilities = [ 
-            'sun', 'all dates',
+        groups = [ 
             'all data', 'all data integration', 'all data full integration',
             'no duplicate', 'no duplicate integration', 'no duplicate full integration',
             'line of sight sdo', 'line of sight stereo',
-            'pov sdo', 'pov stereo',
-            'fit', 'with feet', 'extended fit',
         ]
-        choices_kwargs = {
-            key: False 
-            for key in possibilities
-        }
+        modifiers = ['sun', 'all dates', 'pov sdo', 'pov stereo', 'with feet']
+        possibilities = groups + modifiers
 
-        # DICT reformatting
-        for key in plot_choices: 
-            if key in possibilities: 
-                choices_kwargs[key] = True
-            else: 
+        # DEFAULT (all off)
+        choices = {key: Show(data=False) for key in possibilities}
+
+        for key, value in plot_choices.items():
+            if key not in possibilities:
                 raise ValueError(
                     f"\033[1;0mChoices argument '{key}' not recognized. "
                     f"Valid choices are ['{'\', \''.join(possibilities)}'].\033[0m"
                 ) 
-        return choices_kwargs
+            if isinstance(value, dict):
+                choices[key] = Show(data=value.get('data', False), fit=value.get('fit', False))
+            else:
+                choices[key] = Show(data=bool(value))
+        return choices
 
     @Decorators.running_time
     def _get_data(self) -> CubesData:
@@ -150,6 +161,7 @@ class Setup:
                 colour='grey',
                 opacity=0.4,
                 interpolate=False,
+                show=self._choices['all data'],
             )
 
         if self._choices['no duplicate']: 
@@ -160,6 +172,7 @@ class Setup:
                 colour='red',
                 opacity=1,
                 interpolate=False,
+                show=self._choices['no duplicate'],
             )
 
         if self._choices['all data integration']: 
@@ -172,6 +185,7 @@ class Setup:
                 group_path=path,
                 colour='red',
                 opacity=0.2,
+                show=self._choices['all data integration'],
             )
 
         if self._choices['all data full integration']:
@@ -185,6 +199,7 @@ class Setup:
                 colour='black',
                 opacity=0.1,
                 cube_type='unique',
+                show=self._choices['all data full integration'],
             )
 
         if self._choices['no duplicate integration']:
@@ -197,6 +212,7 @@ class Setup:
                 group_path=path,
                 colour='orange',
                 opacity=0.3,
+                show=self._choices['no duplicate integration'],
             )
 
         if self._choices['no duplicate full integration']:
@@ -210,6 +226,7 @@ class Setup:
                 colour='grey',
                 opacity=0.1,
                 cube_type='unique',
+                show=self._choices['no duplicate full integration'],
             )
 
         if self._choices['line of sight sdo']:
@@ -220,6 +237,7 @@ class Setup:
                 colour='green',
                 opacity=0.02,
                 interpolate=False,
+                show=self._choices['line of sight sdo'],
             )
 
         if self._choices['line of sight stereo']:
@@ -230,6 +248,7 @@ class Setup:
                 colour='blue',
                 opacity=0.02,
                 interpolate=False,
+                show=self._choices['line of sight stereo'],
             )
 
         # POVs sdo, stereo
@@ -293,6 +312,7 @@ class Setup:
             colour: str = ...,
             *,
             cube_type: Literal['real'] = ...,
+            show: Show = ...,
         ) -> CubeInfo: ...
 
     @overload
@@ -304,7 +324,8 @@ class Setup:
             interpolate: bool = ...,
             colour: str = ...,
             *,
-            cube_type: Literal['unique'],
+            cube_type: Literal['unique'] = ...,
+            show: Show = ...,
         ) -> UniqueCubeInfo: ...
 
     @overload # fallback
@@ -317,6 +338,7 @@ class Setup:
             colour: str = ...,
             opacity_polynomial: float = ...,
             cube_type: str = ...,
+            show: Show = ...,
         ) -> CubeInfo | UniqueCubeInfo: ...
 
     def get_cube_info(
@@ -328,8 +350,10 @@ class Setup:
             colour: str = 'blue',
             opacity_polynomial: float = 1.,
             cube_type: str = 'real',
+            show: Show = Show(),
         ) -> CubeInfo | UniqueCubeInfo:
         """
+        todo update docstring
         Gives the protuberance and polynomial fit information for a chosen cube 'type'.
 
         Args:
@@ -373,6 +397,7 @@ class Setup:
                 group_path=group_path,
                 cube_type=cube_type,
                 interpolate=interpolate,
+                show=show,
             )
 
             cube_info = CubeInfo(
@@ -386,6 +411,7 @@ class Setup:
                 dataset_coords=data_coords,
                 dataset_values=data_values,
                 polynomials=polynomials,
+                show=show,
             )
         elif cube_type == 'unique':
             # POLYNOMIAL data
@@ -394,6 +420,7 @@ class Setup:
                 group_path=group_path,
                 cube_type=cube_type,
                 interpolate=interpolate,
+                show=show,
             )
 
             cube_info = UniqueCubeInfo(
@@ -407,6 +434,7 @@ class Setup:
                 dataset_coords=data_coords,
                 dataset_values=data_values,
                 polynomials=polynomials,
+                show=show,
             )
         else:
             raise ValueError(f'cube_type {cube_type} is not implemented.')
@@ -421,6 +449,7 @@ class Setup:
             cube_type: str = ...,
             *,
             interpolate: Literal[False],
+            show: Show = ...,
         ) -> None: ...
 
     @overload
@@ -430,6 +459,7 @@ class Setup:
             group_path: str,
             cube_type: Literal['real'],
             interpolate: Literal[True] = ...,
+            show: Show = ...,
         ) -> list[PolynomialData]: ...
 
     @overload
@@ -439,6 +469,7 @@ class Setup:
             group_path: str,
             cube_type: Literal['unique'] = ...,
             interpolate: Literal[True] = ...,
+            show: Show = ...,
         ) -> list[UniquePolynomialData]: ...
     
     @overload # fallback 1
@@ -448,6 +479,7 @@ class Setup:
             group_path: str,
             cube_type: Literal['real'],
             interpolate: bool = ...,
+            show: Show = ...,
         ) -> list[PolynomialData] | None: ...
 
     @overload # fallback 2
@@ -457,6 +489,7 @@ class Setup:
             group_path: str,
             cube_type: Literal['unique'] = ...,
             interpolate: bool = ...,
+            show: Show = ...,
         ) -> list[UniquePolynomialData] | None: ...
 
     @overload  # fallback main
@@ -465,8 +498,8 @@ class Setup:
             HDF5File: h5py.File,
             group_path: str,
             cube_type: str = ...,
-
             interpolate: bool = ...,
+            show: Show = ...,
         ) -> list[PolynomialData] | list[UniquePolynomialData] | None: ...
 
     def get_polynomial_data(
@@ -475,8 +508,10 @@ class Setup:
             group_path: str,
             cube_type: str = 'unique',
             interpolate: bool = True,
+            show: Show = Show(),
         ) -> list[PolynomialData] | list[UniquePolynomialData] | None:
         """
+        todo update docstring
         To get the polynomial data corresponding to the HDF5 group path.
 
         Args:
@@ -491,9 +526,7 @@ class Setup:
                 fits information. If there is no polynomial data, it returns None.
         """
 
-        # ! need to change this so that I can also decide to visualize the extended polynomial fit
-
-        if self._choices['fit'] and interpolate:  # todo add 'or self.choices['extended fit']'
+        if show.fit and interpolate:
             # POLYNOMIALs setup
             polynomials: list[PolynomialData | UniquePolynomialData] = (
                 [None] * len(self._polynomial_order)

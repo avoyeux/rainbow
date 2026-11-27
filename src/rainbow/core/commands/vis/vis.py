@@ -4,33 +4,21 @@ To 3D visualize the rainbow filament data and the corresponding polynomial fitti
 from __future__ import annotations
 
 # IMPORTs standard
-import os
-import re
-import time
 import threading
 
 # IMPORTs third-party
 import k3d
-import h5py
 import IPython
 import typeguard
 import ipywidgets
 import numpy as np
-from matplotlib import colors as mcolors
-
-# IMPORTs personal
-from common import Decorators, Plot
 
 # IMPORTs local
-from rainbow.config import config
 from .utils import Setup, Camera, CameraInfo, Screenshot, Sun, CubeInfo, UniqueCubeInfo
 
 # TYPE ANNOTATIONs
-from typing import TYPE_CHECKING, Any, overload, Literal, cast
+from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
-    # IMPORTs third-party
-    import numpy.typing as npt
-
     # IMPORTs local
     from rainbow.typing import VoxelAlias, JsLinkAlias, ImageExtension
 
@@ -319,42 +307,42 @@ class Vis(Setup):
         """
 
         # PLACEHOLDER voxels
-        plots: list[VoxelAlias] = [None] * (
-            1 + (len(cube.polynomials) if cube.polynomials is not None else 0)
-        )
+        plots: list[VoxelAlias] = []
 
         # INDEX translation
         index = int(self.constants.time_indexes[index])
         translation = (cube.xt_min_index, cube.yt_min_index, cube.zt_min_index)
 
-        plots[0] = k3d.voxels(
-            voxels=cube[index][0].transpose((2, 1, 0)),
-            name=cube.name,
-            opacity=cube.opacity,
-            color_map=[self.color_str_to_hex(cube.colour)],  #type:ignore
-            translation=translation,
-            bounds=[
-                0, cube.shape[1],
-                0, cube.shape[2],
-                0, cube.shape[3],
-            ],
-            **kwargs,
-        )
-
+        # DATA voxels
+        if cube.show.data:
+            plots.append(k3d.voxels(
+                voxels=cube[index][0].transpose((2, 1, 0)),
+                name=cube.name,
+                opacity=cube.opacity,
+                color_map=[self.color_str_to_hex(cube.colour)],  #type:ignore
+                translation=translation,
+                bounds=[
+                    0, cube.shape[-3],
+                    0, cube.shape[-2],
+                    0, cube.shape[-1],
+                ],
+                **kwargs,
+            ))
+        # POLYNOMIALs
         if cube.polynomials is not None:
             # INTERPOLATIONs setup
             polynomials = cube.polynomials
 
-            # INTERPOLATION orders
-            for i, polynomial_data in enumerate(polynomials):
-                plots[i + 1] = k3d.voxels(
+            # INTERPOLATION order
+            for polynomial_data in cube.polynomials:
+                plots.append(k3d.voxels(
                     voxels=polynomial_data[index].transpose((2, 1, 0)),
                     name=polynomial_data.name,
                     opacity=cube.opacity_polynomial,
                     color_map=[polynomial_data.color_hex],  #type:ignore
                     translation=translation,
                     **kwargs,
-                )
+                ))
         return plots
 
     def find_first_cube(self) -> CubeInfo | None:

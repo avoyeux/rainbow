@@ -1,24 +1,28 @@
 # KEYWORD ARGUMENTs for the jupyter-notebook visualization.
 # DATA
-time_interval: 6
+time_interval: 3
 polynomial_order:
   - 4
 choices: 
-  - 'all dates'
-  - 'sun'
-  # - 'all data'
-  # - 'all data integration'
-  # - 'no duplicate'
-  - 'no duplicate integration'
-  # - 'line of sight sdo'
-  - 'pov stereo'
+  # all dates: false
+  sun: true
+  all data: true
+  no duplicate: true
+  # no duplicate integration:
+  #   data: true
+  #   fit: false
+  # no duplicate full integration:
+  #   data: false
+  #   fit: true
+  # line of sight sdo: true
+  # pov sdo: true
 
 # VIS
-offscreen: true
-name: 'f_stereo_6h'
+offscreen: false
+name: 'test'
 px: 720
 
 # CONFIG
 compression_level: 9
-verbose: 10
+verbose: 5
 flush: true
