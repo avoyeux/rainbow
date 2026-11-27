@@ -31,6 +31,8 @@ if TYPE_CHECKING:
 __all__ = ['TotoInputs']
 
 
+# ! there seems to be small holes in the fake data
+
 
 @dataclass(slots=True, repr=False, eq=False)
 class SdoHeaderInformation:

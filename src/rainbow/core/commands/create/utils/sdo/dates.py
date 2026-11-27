@@ -28,8 +28,6 @@ if TYPE_CHECKING:
 # API public
 __all__ = ['AllSDOMetadata']
 
-# ? should I keep the datetimes with 30 seconds difference when using the first dates from the 
-# ? protuberance data ?
 # todo need to change the date filtering as there is a lot of weird cases after 12.07.24T20.04.00
 # ! the last todo comment is quite important.
 
@@ -42,7 +40,7 @@ class AllSDOMetadata:
     """
 
     # CONSTANTs
-    _first_datetime: datetime = datetime(2012, 7, 23, 0, 0, 43)
+    # _first_datetime: datetime = datetime(2012, 7, 23, 0, 0, 43)
     _search_date_begin: datetime = datetime(2012, 7, 23, 0, 0, 42)
     _search_date_end: datetime = datetime(2012, 7, 25, 12, 0, 0)
 
@@ -109,7 +107,7 @@ class AllSDOMetadata:
         # DATETIMEs conversion
         dates_datetime = [datetime.strptime(s, '%Y-%m-%dT%H:%M:%S') for s in dates_list]
         return dates_datetime
-    
+
     @Decorators.running_time
     def _filter_dates(
             self,
@@ -117,9 +115,8 @@ class AllSDOMetadata:
             used_datetimes: list[datetime],
         ) -> list[SdoData]:
         """
-        To filter the SDO data to keep only the ones that are needed.
-        The needed datetimes are the ones used in the protuberance data and the ones with a time
-        interval of 1 minute.
+        To filter the SDO data to keep only the ones that are needed (i.e. the ones used in the 
+        protuberance data).
 
         Args:
             all_metadata (list[SdoData]): the SDO metadata to filter.
@@ -130,22 +127,21 @@ class AllSDOMetadata:
         """
 
         # NEW RANGE of dates
-        date_range = self._search_date_end - self._search_date_begin
-        date_range = int(date_range.total_seconds() // 60) + 1
+        # date_range = self._search_date_end - self._search_date_begin
+        # date_range = int(date_range.total_seconds() // 60) + 1
 
         # INDEXEs to keep
         used_indexes: list[int] = [None] * len(used_datetimes)  #type:ignore
         for i, used_date in enumerate(used_datetimes):
             for j, metadata in enumerate(all_metadata):
                 if metadata.date_obs == used_date: used_indexes[i] = j; break
-        new_indexes: list[int] = []
-        for i in range(date_range):
-            for j, metadata in enumerate(all_metadata):
-                if metadata.date_obs == self._needed_datetime(i): new_indexes.append(j); break # ! 20 missing
-        keep_indexes = sorted(list(set(used_indexes + new_indexes)))
-
-        # SDO data filtering
-        return [self._fits_location_update(all_metadata[i]) for i in keep_indexes]
+        keep = sorted(list(set(used_indexes)))
+        # new_indexes: list[int] = []
+        # for i in range(date_range):
+        #     for j, metadata in enumerate(all_metadata):
+        #         if metadata.date_obs == self._needed_datetime(i): new_indexes.append(j); break # ! 20 missing
+        # keep_indexes = sorted(list(set(used_indexes + new_indexes)))
+        return [self._fits_location_update(all_metadata[i]) for i in keep]
 
     def _fits_location_update(self, metadata: SdoData) -> SdoData:
         """
@@ -162,18 +158,18 @@ class AllSDOMetadata:
         metadata.ias_location = metadata.ias_location + '/S00000/image_lev1.fits'
         return metadata
 
-    def _needed_datetime(self, time_coef: int) -> datetime:
-        """
-        To get the different datetimes needed from the SDO data.
+    # def _needed_datetime(self, time_coef: int) -> datetime:
+    #     """
+    #     To get the different datetimes needed from the SDO data.
 
-        Args:
-            time_coef (int): the coefficient to multiply the time difference with the first date.
+    #     Args:
+    #         time_coef (int): the coefficient to multiply the time difference with the first date.
 
-        Returns:
-            datetime: the datetime needed from the SDO data.
-        """
+    #     Returns:
+    #         datetime: the datetime needed from the SDO data.
+    #     """
 
-        return self._first_datetime + timedelta(minutes=1 * time_coef)
+    #     return self._first_datetime + timedelta(minutes=1 * time_coef)
 
     def _no_microseconds(self, metadata: SdoData) -> SdoData:
         """

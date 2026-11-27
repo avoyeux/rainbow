@@ -367,8 +367,7 @@ class Create(BaseHDF5Protuberance):
             ]).astype('S19'),
             'unit': 'none',
             'description': (
-                "The dates of the SDO acquisitions. These represent all the possible dates and "
-                "are indexed in the same way than the data cubes."
+                "The dates of the SDO acquisitions for which a STEREO B 30.4nm acquisition exists."
             ),
         }
         ias_path_info = {  
