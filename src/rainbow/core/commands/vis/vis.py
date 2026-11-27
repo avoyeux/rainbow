@@ -38,7 +38,7 @@ if TYPE_CHECKING:
     import numpy.typing as npt
 
     # IMPORTs local
-    from rainbow.typing import VoxelAlias, JsLinkAlias
+    from rainbow.typing import VoxelAlias, JsLinkAlias, ImageExtension
 
 # API public
 __all__ = ['Vis']
@@ -646,6 +646,7 @@ class Vis(Setup):
             texture_resolution: int = 960,  
             offscreen: bool = False,
             px: int = 1080,
+            extension: ImageExtension = '.png',
             **kwargs,
         ) -> None:
         """
@@ -676,7 +677,9 @@ class Vis(Setup):
                 points need to be displayed phi direction. Defaults to 960.
             offscreen (bool, optional): deciding to render every frame to a PNG sequence with a
                 headless browser. Defaults to False.
+            px (int, optional): the width and height in pixels. Defaults to 1080.
             **kwargs: the other arguments to pass to the parent class.
+            extension (ImageExtension, optional): the extension of the screenshots. Defaults to '.png'.
         """
 
         # PARENT init
@@ -718,7 +721,7 @@ class Vis(Setup):
         self._animation()
 
         # OFFSCREEN
-        if offscreen: self._save_offscreen(name=name, width=px, height=px)
+        if offscreen: self._save_offscreen(name=name, px=px, extension=extension)
 
     def _get_camera(
             self,
@@ -1044,19 +1047,17 @@ class Vis(Setup):
     def _save_offscreen(
             self,
             name: str,
-            width: int,
-            height: int,
+            px: int,
+            extension: ImageExtension,
         ) -> None:
         """
         Renders every frame to a PNG sequence with a headless browser.
 
         Args:
             name -- str
-                The start of the name of the output PNG files.
-            width -- int
-                Browser width in pixels. Defaults to 1920.
-            height -- int
-                Browser height in pixels. Defaults to 1080.
+                The start of the name of the output file.
+            px -- int
+                Frame width and height in pixels.
         """
 
         if self._verbose > 0:
@@ -1066,10 +1067,10 @@ class Vis(Setup):
         with Screenshot(
             plot=self._plot,
             name=name,
-            width=width,
-            height=height,
+            px=px,
             only_canvas=False,
             axes_helper_pos=(0.05, 0.05),
+            extension=extension,
             ) as screenshots:
 
             # CUBEs loop

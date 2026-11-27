@@ -1,13 +1,14 @@
 """
-Headless PNG capture for the k3d visualization.
+Headless frame capture for the k3d visualization.
 """
 from __future__ import annotations
 
 # IMPORTs standard
+import io
 import os
-import time
 
 # IMPORTs third-party
+from PIL import Image
 from k3d.headless import get_headless_driver, k3d_remote
 
 # IMPORTs local
@@ -19,6 +20,9 @@ from typing import TYPE_CHECKING, Any, Self
 if TYPE_CHECKING:
     # IMPORTs third-party
     from k3d.plot import Plot
+
+    # IMPORTs local
+    from rainbow.typing import ImageExtension
 
 # API public
 __all__ = ['Screenshot']
@@ -41,58 +45,58 @@ def _headless_extra_args() -> list[str]:
 
 class Screenshot:
     """
-    To capture PNG frames of a ``k3d.plot`` with a headless browser.
+    To capture frames of a ``k3d.plot`` with a headless browser and save them.
 
     Usage:
-        with Screenshot(plot, width=1920, height=1080) as shots: shots.save('frame.png')
+        with Screenshot(plot, name='frames', px=1920) as shots: shots.save('0001')
     """
 
     def __init__(
             self,
             plot: Plot,
             name: str = '',
-            width: int = 1920,
-            height: int = 1080,
+            px: int = 1280,
             label_size: float = 1.2,
             only_canvas: bool = True,
             extra_args: list[str] | None = None,
             driver: Any = None,
             axes_helper_pos: tuple[float, float] | None = None,
+            extension: ImageExtension = '.png',
         ) -> None:
         """
-        Captures PNG frames of a ``k3d.plot`` with a headless browser.
-        Use the 'save' method to save the frames to png.
+        Captures frames of a ``k3d.plot`` with a headless browser.
+        Use the 'save' method to save the frames.
 
         Args:
             plot -- k3d.plot.Plot
                 The plot to render.
             name -- str (default: '')
                 The chosen name for the capture session.
-            width -- int (default: 1920)
-                Browser width in pixels.
-            height -- int (default: 1080)
-                Browser height in pixels.
+            px -- int (default: 1280)
+                Output image width and height in pixels.
             label_size -- float (default: 1.2)
                 Triad label size in em (CSS unit).
             only_canvas -- bool (default: True)
                 Whether to capture only the WebGL canvas instead of the whole page.
             extra_args -- list[str] | None (default: None)
                 The extra Chrome switches appended after the ones
-                this module needs, e.g. ``['--enable-precise-memory-info']``. Defaults to None.
+                this module needs, e.g. ``['--enable-precise-memory-info']``.
             driver -- Any | None (default: None)
                 The pre-built Selenium driver to use instead of creating one.
             axes_helper_pos -- tuple[float, float] | None (default: None)
                 Where to place the orientation triad in the saved image, as the fraction
                 ``(x, y)`` of the image, measured from its bottom-left corner. None keeps k3d
                 defaults.
+            extension -- ImageExtension (default: '.png')
+                The file extension to use for the saved images.
         """
 
         # ARGs
         self._plot = plot
-        self._width = width
-        self._height = height
+        self._px = px
         self._label_size = label_size
         self._only_canvas = only_canvas
+        self._extension = extension
         self._extra_args = extra_args
         self._driver = driver
         self._axes_helper_pos = axes_helper_pos
@@ -121,8 +125,8 @@ class Screenshot:
         self._remote = k3d_remote(
             k3d_plot=self._plot,
             driver=self._driver,
-            width=self._width,
-            height=self._height,
+            width=self._px,
+            height=self._px,
         )
 
         # MOVE the orientation triad
@@ -138,7 +142,7 @@ class Screenshot:
 
     def save(self, ID: str, sync: bool = True) -> str:
         """
-        Renders the current scene and saves it as a png.
+        Renders the current scene and saves it.
 
         Args:
             ID -- str
@@ -154,7 +158,7 @@ class Screenshot:
         self._require_session()
 
         # SYNC
-        path = os.path.join(self._dir, f'frame{ID}.png')
+        path = os.path.join(self._dir, f'frame{ID}{self._extension}')
         if sync: self._sync()
 
         # AXES label pos
@@ -191,15 +195,20 @@ class Screenshot:
 
     def _capture(self, path: str) -> None:
         """
-        Renders the current scene and saves it as a PNG to ``path``.
+        Renders the current scene and saves it.
 
         Args:
             path -- str
                 The file to write.
         """
 
-        png = self._remote.get_screenshot(only_canvas=self._only_canvas)
-        with open(path, 'wb') as file: file.write(png)
+        png: bytes = self._remote.get_screenshot(only_canvas=self._only_canvas)
+
+        if self._extension == '.png':
+            with open(path, 'wb') as file: file.write(png)
+        else:
+            img = Image.open(io.BytesIO(png)).convert('RGB')
+            img.save(path)
 
     def _require_session(self) -> None:
         """

@@ -94,7 +94,7 @@ dir:
 file:
     stereo_info: !join [*_stereo, 'stereo_304.save']
     timestamps: !join [*_input, 'SDO_timestamps.txt']
-    data: !join [*_hdf5, 'data_new.h5']
+    data: !join [*_hdf5, 'data.h5']
 
     # Commands
     _path: &_config !join [*root, 'config']
